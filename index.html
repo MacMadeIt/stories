@@ -630,10 +630,10 @@ function updateField(key, value) {
 }
 
 // ─────────────────────────────────────────
-// GOOGLE DRIVE CONFIG
+// GOOGLE APPS SCRIPT CONFIG
+// Paste your Web App URL here after setup:
 // ─────────────────────────────────────────
-const DRIVE_API_KEY   = 'AIzaSyBz_pPEsGEUi3B4RvHBpFn8259kSYre02M';
-const DRIVE_FOLDER_ID = '1KuYghLpECstAnn7BUyiypuiSlyimEx8a';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbFYVt8o_155DuTuMdUEU0wuvxoMjFtp1PgAT8ukfEQAZjPPeqavQ9YqFuNgKK88M4/exec';
 
 function setStatus(msg, color) {
   const el = document.getElementById('statusMsg');
@@ -641,32 +641,24 @@ function setStatus(msg, color) {
 }
 
 async function uploadToDrive(blob, filename) {
-  // Step 1: initiate resumable upload to get upload URL
-  const meta = JSON.stringify({ name: filename, parents: [DRIVE_FOLDER_ID] });
-  const initRes = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${DRIVE_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'multipart/related; boundary=boundary_string' },
-      body: `--boundary_string\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--boundary_string\r\nContent-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\n`,
-    }
-  );
+  // Convert blob to base64
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  const base64 = btoa(binary);
 
-  // Use multipart upload properly
-  const formData = new FormData();
-  formData.append('metadata', new Blob([meta], { type: 'application/json' }));
-  formData.append('file', blob, filename);
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, data: base64 }),
+  });
 
-  const res = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${DRIVE_API_KEY}`,
-    { method: 'POST', body: formData }
-  );
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || 'Upload failed');
-  }
-  return await res.json();
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { throw new Error('Unexpected response from server'); }
+  if (json.status !== 'ok') throw new Error(json.message || 'Upload failed');
+  return json;
 }
 
 // ─────────────────────────────────────────
