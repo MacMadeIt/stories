@@ -597,14 +597,13 @@ function renderForm() {
       ${renderPreviewLines()}
     </div>
 
-    <button class="download-btn" onclick="generateDocx()">
+    <button class="download-btn" onclick="generateDocx('send')">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
+        <path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/>
       </svg>
-      Download Word Document
+      Send to Teacher
     </button>
+    <div id="statusMsg" style="margin-top:12px; text-align:center; font-size:0.85rem; min-height:1.4em;"></div>
   `;
 }
 
@@ -631,9 +630,49 @@ function updateField(key, value) {
 }
 
 // ─────────────────────────────────────────
+// GOOGLE DRIVE CONFIG
+// ─────────────────────────────────────────
+const DRIVE_API_KEY   = 'AIzaSyBz_pPEsGEUi3B4RvHBpFn8259kSYre02M';
+const DRIVE_FOLDER_ID = '1KuYghLpECstAnn7BUyiypuiSlyimEx8a';
+
+function setStatus(msg, color) {
+  const el = document.getElementById('statusMsg');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--muted)'; }
+}
+
+async function uploadToDrive(blob, filename) {
+  // Step 1: initiate resumable upload to get upload URL
+  const meta = JSON.stringify({ name: filename, parents: [DRIVE_FOLDER_ID] });
+  const initRes = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${DRIVE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/related; boundary=boundary_string' },
+      body: `--boundary_string\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--boundary_string\r\nContent-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\n`,
+    }
+  );
+
+  // Use multipart upload properly
+  const formData = new FormData();
+  formData.append('metadata', new Blob([meta], { type: 'application/json' }));
+  formData.append('file', blob, filename);
+
+  const res = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${DRIVE_API_KEY}`,
+    { method: 'POST', body: formData }
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || 'Upload failed');
+  }
+  return await res.json();
+}
+
+// ─────────────────────────────────────────
 // GENERATE DOCX
 // ─────────────────────────────────────────
-async function generateDocx() {
+async function generateDocx(mode) {
   const { Document, Packer, Paragraph, TextRun, AlignmentType, UnderlineType, BorderStyle } = docx;
 
   const FONT = "Arial";
@@ -724,12 +763,24 @@ async function generateDocx() {
   });
 
   const blob = await Packer.toBlob(doc);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = currentStory.title.replace(/\s+/g, '_') + '_script.docx';
-  a.click();
-  URL.revokeObjectURL(url);
+  const filename = currentStory.title.replace(/\s+/g, '_') + '_script.docx';
+
+  const btn = document.querySelector('.download-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+  setStatus('Uploading to teacher\'s folder...', 'var(--muted)');
+
+  try {
+    await uploadToDrive(blob, filename);
+    setStatus('Sent! Your teacher will print it for you.', 'var(--green)');
+  } catch (err) {
+    setStatus('Something went wrong: ' + err.message, '#c0622a');
+    console.error(err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Send to Teacher`;
+    }
+  }
 }
 
 // ─────────────────────────────────────────
