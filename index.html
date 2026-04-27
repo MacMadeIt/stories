@@ -58,6 +58,50 @@
     padding: 2rem 1.5rem;
   }
 
+  /* Level tabs */
+  .level-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .level-tab {
+    padding: 0.45rem 1.1rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--border);
+    background: white;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .level-tab:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .level-tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+  .level-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    letter-spacing: 0.04em;
+  }
+  .badge-pre { background: #e8f4fd; color: #2a5280; }
+  .badge-a1  { background: #eaf3ec; color: #3a6b45; }
+  .badge-a2  { background: #fef3e2; color: #8a5a00; }
+  .badge-b1  { background: #f3e8fd; color: #5a2d82; }
+  .badge-b2  { background: #fde8f0; color: #8a1a40; }
+
   /* Story picker */
   .story-grid {
     display: grid;
@@ -298,11 +342,12 @@
 
 <header>
   <h1>Story Script Maker</h1>
-  <p>For ESL classrooms · Pre-A1 / A1 level</p>
+  <p>For ESL classrooms · Pre-A1 / A1 / A2 / B1 / B2</p>
 </header>
 
 <div class="container">
 
+  <div class="level-tabs" id="levelTabs"></div>
   <div class="story-grid" id="storyPicker"></div>
 
   <div id="formArea">
@@ -327,18 +372,19 @@ const STORIES = [
 
   {
     id: 'lrrh',
+    level: 'A1',
     emoji: '🐺',
     title: 'Little Red Riding Hood',
     desc: 'A girl walks through the forest to visit her grandmother.',
     fields: [
-      { key: 'girl',   label: "Girl's name",      hint: 'name' },
-      { key: 'gran',   label: "Grandmother's name", hint: 'name' },
-      { key: 'wolf',   label: "Villain's name",    hint: 'name' },
-      { key: 'helper', label: "Helper's name",     hint: 'name' },
-      { key: 'place',  label: 'Where she walks',   hint: 'place' },
-      { key: 'home',   label: "Gran's home",        hint: 'place' },
-      { key: 'gift',   label: 'What she carries',  hint: 'noun' },
-      { key: 'verb',   label: 'How the villain moves', hint: 'verb' },
+      { key: 'girl',   label: 'Character 1 name', hint: 'name — a girl' },
+      { key: 'gran',   label: 'Character 2 name',  hint: 'name — e.g. a grandmother' },
+      { key: 'wolf',   label: 'Character 3 name',  hint: 'name — the bad guy' },
+      { key: 'helper', label: 'Character 4 name',  hint: 'name — the helper' },
+      { key: 'place',  label: 'A place in nature',  hint: 'place — e.g. forest, park, mountain' },
+      { key: 'home',   label: "Character 2's home", hint: 'place — e.g. a small house, a cottage' },
+      { key: 'gift',   label: 'Present she carries', hint: 'plural noun — e.g. books, cookies, flowers' },
+      { key: 'verb',   label: 'How Character 3 moves', hint: 'movement verb — e.g. jump, run, walk' },
     ],
     scenes: [
       { label: 'Scene 1 — At home', lines: [
@@ -346,20 +392,24 @@ const STORIES = [
         { type:'dialog', speaker:'Mother', parts:[ {k:'girl'}, ', please take ', {k:'gift'}, ' to ', {k:'gran'}, '. She lives in ', {k:'home'}, '.' ] },
         { type:'dialog', speaker:'{girl}', parts:[ 'OK, Mum! I am ready. Goodbye!' ] },
       ]},
-      { label: 'Scene 2 — In the forest', lines: [
-        { type:'stage', parts:[ {k:'girl'}, ' walks in ', {k:'place'}, '. ', {k:'wolf'}, ' ', {k:'verb'}, 's to her.' ] },
+      { label: 'Scene 2 — In the ', labelSuffix: '{place}', lines: [
+        { type:'stage', parts:[ {k:'girl'}, ' walks in the ', {k:'place'}, '. ', {k:'wolf'}, ' ', {k:'verb'}, 's to her.' ] },
         { type:'dialog', speaker:'{wolf}', parts:[ 'Hello! Where are you going?' ] },
         { type:'dialog', speaker:'{girl}', parts:[ 'I am going to ', {k:'gran'}, "'s house. She lives in ", {k:'home'}, '.' ] },
         { type:'dialog', speaker:'{wolf}', parts:[ 'OK. Goodbye!' ] },
         { type:'stage', parts:[ {k:'wolf'}, ' ', {k:'verb'}, 's to ', {k:'home'}, ' first.' ] },
       ]},
-      { label: "Scene 3 — At gran's house", lines: [
+      { label: "Scene 3 — At Character 2's house", lines: [
         { type:'stage', parts:[ {k:'girl'}, ' knocks on the door.' ] },
         { type:'dialog', speaker:'{girl}', parts:[ {k:'gran'}, '! I am here! I have ', {k:'gift'}, ' for you!' ] },
         { type:'dialog', speaker:'{wolf}', parts:[ '(pretending) Come in, come in!' ] },
         { type:'dialog', speaker:'{girl}', parts:[ {k:'gran'}, ', your eyes are very big!' ] },
         { type:'dialog', speaker:'{wolf}', parts:[ 'Yes! I can see you better!' ] },
-        { type:'stage', parts:[ {k:'wolf'}, ' jumps up! ', {k:'girl'}, ' screams. ', {k:'helper'}, ' ', {k:'verb'}, 's to the house.' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ {k:'gran'}, ', your hands are very big!' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'Yes! I can take your ', {k:'gift'}, ' better!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' jumps up and tries to grab the ', {k:'gift'}, '!' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ '(screams) Help! Help! Someone help me!' ] },
+        { type:'stage', parts:[ {k:'helper'}, ' hears and ', {k:'verb'}, 's to the house.' ] },
       ]},
       { label: 'Scene 4 — The ending', lines: [
         { type:'dialog', speaker:'{helper}', parts:[ 'Stop! Go away!' ] },
@@ -372,6 +422,7 @@ const STORIES = [
 
   {
     id: 'pigs',
+    level: 'A1',
     emoji: '🐷',
     title: 'The Three Little Pigs',
     desc: 'Three pigs build houses. A wolf tries to blow them down.',
@@ -412,6 +463,7 @@ const STORIES = [
 
   {
     id: 'goldi',
+    level: 'A1',
     emoji: '🐻',
     title: 'Goldilocks and the Three Bears',
     desc: 'A girl finds a house in the forest. Three bears live there!',
@@ -448,6 +500,7 @@ const STORIES = [
 
   {
     id: 'jack',
+    level: 'A1',
     emoji: '🫘',
     title: 'Jack and the Beanstalk',
     desc: 'A boy trades a cow for magic beans and climbs to a giant\'s castle.',
@@ -482,6 +535,7 @@ const STORIES = [
 
   {
     id: 'cinderella',
+    level: 'Pre-A1',
     emoji: '👠',
     title: 'Cinderella',
     desc: 'A kind girl goes to a royal party with help from a fairy.',
@@ -517,6 +571,7 @@ const STORIES = [
 
   {
     id: 'duckling',
+    level: 'Pre-A1',
     emoji: '🦢',
     title: 'The Ugly Duckling',
     desc: 'A different baby bird feels alone, but finds where it belongs.',
@@ -558,18 +613,43 @@ const STORIES = [
 let currentStory = null;
 let fieldValues = {};
 let studentInfo = { names: '', class: '' };
+let currentLevel = 'All';
 
 // ─────────────────────────────────────────
 // RENDER STORY PICKER
 // ─────────────────────────────────────────
+const LEVELS = ['All', 'Pre-A1', 'A1', 'A2', 'B1', 'B2'];
+const BADGE_CLASS = { 'Pre-A1': 'badge-pre', 'A1': 'badge-a1', 'A2': 'badge-a2', 'B1': 'badge-b1', 'B2': 'badge-b2' };
+
+function renderTabs() {
+  const tabs = document.getElementById('levelTabs');
+  if (!tabs) return;
+  tabs.innerHTML = LEVELS.map(l => `
+    <button class="level-tab ${currentLevel === l ? 'active' : ''}"
+            onclick="selectLevel('${l}')">${l}</button>
+  `).join('');
+}
+
+function selectLevel(level) {
+  currentLevel = level;
+  currentStory = null;
+  fieldValues = {};
+  renderTabs();
+  renderPicker();
+  document.getElementById('formArea').innerHTML = '<div class="placeholder-msg"><span>📖</span>Choose a story above to get started!</div>';
+}
+
 function renderPicker() {
   const grid = document.getElementById('storyPicker');
-  grid.innerHTML = STORIES.map(s => `
-    <button class="story-btn ${currentStory && currentStory.id === s.id ? 'active' : ''}"
+  const filtered = currentLevel === 'All' ? STORIES : STORIES.filter(s => s.level === currentLevel);
+  grid.innerHTML = filtered.map(s => {
+    const badge = s.level ? `<span class="level-badge ${BADGE_CLASS[s.level] || ''}">${s.level}</span>` : '';
+    return `<button class="story-btn ${currentStory && currentStory.id === s.id ? 'active' : ''}"
             onclick="selectStory('${s.id}')">
+      ${badge}
       <span>${s.emoji}</span>${s.title}
-    </button>
-  `).join('');
+    </button>`;
+  }).join('');
 }
 
 // ─────────────────────────────────────────
@@ -674,7 +754,14 @@ function renderForm() {
 
 function renderPreviewLines() {
   return currentStory.scenes.map(scene => `
-    <div class="preview-scene">${scene.label}</div>
+    <div class="preview-scene">${scene.label}${
+      scene.labelSuffix
+        ? (scene.labelSuffix.replace(/\{(\w+)\}/g, (_, k) => {
+            const v = fieldValues[k] && fieldValues[k].trim();
+            return v ? v.charAt(0).toUpperCase() + v.slice(1) : '____';
+          }))
+        : ''
+    }</div>
     ${scene.lines.map(line => {
       if (line.type === 'stage') {
         return `<div class="stage-line">(${resolve(line.parts, true)})</div>`;
@@ -806,7 +893,12 @@ function buildDocXml() {
   for (const scene of currentStory.scenes) {
     // Scene heading
     body += xmlPara(
-      xmlRun(scene.label, { font: F, size: 18, bold: true, color: '444444' }),
+      xmlRun(scene.label + (scene.labelSuffix
+        ? scene.labelSuffix.replace(/\{(\w+)\}/g, function(_, k) {
+            var v = fieldValues[k] && fieldValues[k].trim();
+            return v ? v.charAt(0).toUpperCase() + v.slice(1) : '____';
+          })
+        : ''), { font: F, size: 18, bold: true, color: '444444' }),
       { before: 200, after: 60, borderBottom: true }
     );
 
@@ -1000,6 +1092,7 @@ async function generateDocx() {
 // ─────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────
+renderTabs();
 renderPicker();
 </script>
 </body>
