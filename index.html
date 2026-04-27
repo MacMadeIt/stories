@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Story Script Maker</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<script src="docx.js"></script>
 <style>
   :root {
     --cream: #fdf8f0;
@@ -696,8 +695,7 @@ function updateField(key, value) {
 }
 
 // ─────────────────────────────────────────
-// GOOGLE APPS SCRIPT CONFIG
-// Paste your Web App URL here after setup:
+// GOOGLE APPS SCRIPT
 // ─────────────────────────────────────────
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbFYVt8o_155DuTuMdUEU0wuvxoMjFtp1PgAT8ukfEQAZjPPeqavQ9YqFuNgKK88M4/exec';
 
@@ -707,25 +705,20 @@ function setStatus(msg, color) {
 }
 
 async function uploadToDrive(blob, filename) {
-  // Convert blob to base64
   const arrayBuffer = await blob.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
   const base64 = btoa(binary);
-
-  // Use form-encoded POST — Apps Script handles this without CORS issues
   const params = new URLSearchParams();
   params.append('filename', filename);
   params.append('data', base64);
-
   const res = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
     redirect: 'follow',
   });
-
   const text = await res.text();
   let json;
   try { json = JSON.parse(text); } catch { throw new Error('Server error: ' + text.slice(0, 200)); }
@@ -734,119 +727,244 @@ async function uploadToDrive(blob, filename) {
 }
 
 // ─────────────────────────────────────────
-// GENERATE DOCX
+// BUILD DOCX XML (no external library)
 // ─────────────────────────────────────────
-async function generateDocx(mode) {
-  // Wait for docx library to be available (up to 10 seconds)
-  let waited = 0;
-  while (typeof docx === 'undefined' && waited < 10000) {
-    await new Promise(r => setTimeout(r, 200));
-    waited += 200;
-  }
-  if (typeof docx === 'undefined') {
-    setStatus('Error: script library failed to load. Please refresh the page and try again.', '#c0622a');
-    return;
-  }
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, UnderlineType, BorderStyle } = docx;
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
-  const FONT = "Arial";
-  const SB = 22, SH = 16, SS = 18;
-  const BLANK = "_____________";
+function xmlRun(text, opts = {}) {
+  const rpr = [
+    opts.bold    ? '<w:b/>'        : '',
+    opts.italic  ? '<w:i/>'        : '',
+    opts.underline ? '<w:u w:val="single"/>' : '',
+    opts.size    ? `<w:sz w:val="${opts.size}"/><w:szCs w:val="${opts.size}"/>` : '',
+    opts.color   ? `<w:color w:val="${opts.color}"/>` : '',
+    opts.font    ? `<w:rFonts w:ascii="${opts.font}" w:hAnsi="${opts.font}"/>` : '',
+  ].join('');
+  return `<w:r>${rpr ? '<w:rPr>' + rpr + '</w:rPr>' : ''}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+}
 
-  function blankOrValue(key) {
-    const val = fieldValues[key] && fieldValues[key].trim();
-    if (val) return [new TextRun({ text: val, font: FONT, size: SB, bold: true })];
-    return [new TextRun({ text: '  ' + BLANK + '  ', underline: { type: UnderlineType.SINGLE }, font: FONT, size: SB })];
-  }
+function xmlPara(runs, opts = {}) {
+  const ppr = [
+    opts.align  ? `<w:jc w:val="${opts.align}"/>` : '',
+    opts.before || opts.after ? `<w:spacing w:before="${opts.before||0}" w:after="${opts.after||0}"/>` : '',
+    opts.borderBottom ? `<w:pBdr><w:bottom w:val="single" w:sz="4" w:space="3" w:color="CCCCCC"/></w:pBdr>` : '',
+  ].join('');
+  return `<w:p>${ppr ? '<w:pPr>' + ppr + '</w:pPr>' : ''}${runs}</w:p>`;
+}
 
-  function plain(text) {
-    return new TextRun({ text, font: FONT, size: SB });
-  }
+function buildDocXml() {
+  const BLANK = '_____________';
+  const F = 'Arial';
 
-  function buildRuns(parts) {
-    return parts.flatMap(p => {
-      if (typeof p === 'string') return [plain(p)];
-      return blankOrValue(p.k);
-    });
-  }
-
-  function scenePara(label) {
-    return new Paragraph({
-      spacing: { before: 200, after: 60 },
-      border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC', space: 3 } },
-      children: [new TextRun({ text: label, font: FONT, size: SS, bold: true, color: '444444' })]
-    });
+  function val(key) {
+    return fieldValues[key] && fieldValues[key].trim();
   }
 
-  function stagePara(parts) {
-    return new Paragraph({
-      spacing: { before: 50, after: 50 },
-      children: [
-        new TextRun({ text: '(', font: FONT, size: SB, italics: true, color: '666666' }),
-        ...buildRuns(parts).map(r => { r._data.options.italics = true; r._data.options.color = r._data.options.bold ? '333333' : '666666'; return r; }),
-        new TextRun({ text: ')', font: FONT, size: SB, italics: true, color: '666666' }),
-      ]
-    });
+  function resolveRuns(parts, italic) {
+    return parts.map(p => {
+      if (typeof p === 'string') {
+        return xmlRun(p, { font: F, size: 22, italic, color: italic ? '666666' : '000000' });
+      }
+      const v = val(p.k);
+      if (v) return xmlRun(v, { font: F, size: 22, bold: true, italic, color: italic ? '333333' : '000000' });
+      return xmlRun('  ' + BLANK + '  ', { font: F, size: 22, underline: true, italic, color: italic ? '888888' : '000000' });
+    }).join('');
   }
 
-  function dialogPara(speaker, parts) {
-    const spkText = resolveSpeaker(speaker) || '';
-    return new Paragraph({
-      spacing: { before: 50, after: 50 },
-      children: [
-        new TextRun({ text: spkText + ': ', font: FONT, size: SB, bold: true }),
-        ...buildRuns(parts),
-      ]
-    });
+  function speakerText(speaker) {
+    if (!speaker) return '';
+    const m = speaker.match(/^\{(\w+)\}$/);
+    if (m) return val(m[1]) || BLANK;
+    return speaker;
   }
 
-  const children = [
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 80 },
-      children: [new TextRun({ text: currentStory.title, font: FONT, size: 36, bold: true })]
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 60 },
-      children: [new TextRun({ text: 'Read your new story!', font: FONT, size: SH, italics: true, color: '888888' })]
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 220 },
-      children: [
-        new TextRun({ text: `${studentInfo.class}  ·  `, font: FONT, size: SH, color: '888888' }),
-        new TextRun({ text: studentInfo.names.trim(), font: FONT, size: SH, bold: true, color: '444444' }),
-      ]
-    }),
-  ];
+  let body = '';
+
+  // Title
+  body += xmlPara(
+    xmlRun(currentStory.title, { font: F, size: 36, bold: true }),
+    { align: 'center', before: 0, after: 80 }
+  );
+  // Subtitle
+  body += xmlPara(
+    xmlRun('Read your new story!', { font: F, size: 16, italic: true, color: '888888' }),
+    { align: 'center', before: 0, after: 60 }
+  );
+  // Student info line
+  body += xmlPara(
+    xmlRun((studentInfo.class || '') + '  ·  ', { font: F, size: 16, color: '888888' }) +
+    xmlRun(studentInfo.names.trim() || '', { font: F, size: 16, bold: true, color: '444444' }),
+    { align: 'center', before: 0, after: 200 }
+  );
 
   for (const scene of currentStory.scenes) {
-    children.push(scenePara(scene.label));
+    // Scene heading
+    body += xmlPara(
+      xmlRun(scene.label, { font: F, size: 18, bold: true, color: '444444' }),
+      { before: 200, after: 60, borderBottom: true }
+    );
+
     for (const line of scene.lines) {
       if (line.type === 'stage') {
-        children.push(stagePara(line.parts));
+        const inner = xmlRun('(', { font: F, size: 22, italic: true, color: '666666' })
+          + resolveRuns(line.parts, true)
+          + xmlRun(')', { font: F, size: 22, italic: true, color: '666666' });
+        body += xmlPara(inner, { before: 50, after: 50 });
       } else {
-        children.push(dialogPara(line.speaker, line.parts));
+        const spk = speakerText(line.speaker);
+        const runs = xmlRun(spk + ': ', { font: F, size: 22, bold: true })
+          + resolveRuns(line.parts, false);
+        body += xmlPara(runs, { before: 50, after: 50 });
       }
     }
   }
 
-  const doc = new Document({
-    sections: [{
-      properties: {
-        page: {
-          size: { width: 11906, height: 16838 },
-          margin: { top: 900, right: 900, bottom: 900, left: 900 }
-        }
-      },
-      children
-    }]
-  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>${body}<w:sectPr>
+  <w:pgSz w:w="11906" w:h="16838"/>
+  <w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900"/>
+</w:sectPr></w:body></w:document>`;
+}
 
-  const blob = await Packer.toBlob(doc);
+async function buildDocxBlob() {
+  // A .docx is a zip file. We build it manually using only browser APIs.
+  const docXml = buildDocXml();
 
-  // Validate student info
+  const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+  const wordRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`;
+
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+
+  // Build zip using fflate (small, fast, pure JS zip library via CDN — tiny and allowed)
+  // Actually build zip manually — pure browser, no library
+  function strToBytes(str) {
+    return new TextEncoder().encode(str);
+  }
+
+  function makeZip(files) {
+    // Simple uncompressed zip builder
+    const enc = new TextEncoder();
+    const localHeaders = [];
+    const centralDirs = [];
+    let offset = 0;
+
+    for (const [name, content] of files) {
+      const nameBytes = enc.encode(name);
+      const dataBytes = typeof content === 'string' ? enc.encode(content) : content;
+      const crc = crc32(dataBytes);
+      const size = dataBytes.length;
+
+      // Local file header
+      const local = new Uint8Array(30 + nameBytes.length + size);
+      const dv = new DataView(local.buffer);
+      dv.setUint32(0, 0x04034b50, true); // signature
+      dv.setUint16(4, 20, true);  // version needed
+      dv.setUint16(6, 0, true);   // flags
+      dv.setUint16(8, 0, true);   // compression (0=store)
+      dv.setUint16(10, 0, true);  // mod time
+      dv.setUint16(12, 0, true);  // mod date
+      dv.setUint32(14, crc, true);
+      dv.setUint32(18, size, true);
+      dv.setUint32(22, size, true);
+      dv.setUint16(26, nameBytes.length, true);
+      dv.setUint16(28, 0, true);
+      local.set(nameBytes, 30);
+      local.set(dataBytes, 30 + nameBytes.length);
+      localHeaders.push(local);
+
+      // Central directory entry
+      const cd = new Uint8Array(46 + nameBytes.length);
+      const cdv = new DataView(cd.buffer);
+      cdv.setUint32(0, 0x02014b50, true);
+      cdv.setUint16(4, 20, true);
+      cdv.setUint16(6, 20, true);
+      cdv.setUint16(8, 0, true);
+      cdv.setUint16(10, 0, true);
+      cdv.setUint16(12, 0, true);
+      cdv.setUint16(14, 0, true);
+      cdv.setUint32(16, crc, true);
+      cdv.setUint32(20, size, true);
+      cdv.setUint32(24, size, true);
+      cdv.setUint16(28, nameBytes.length, true);
+      cdv.setUint16(30, 0, true);
+      cdv.setUint16(32, 0, true);
+      cdv.setUint16(34, 0, true);
+      cdv.setUint16(36, 0, true);
+      cdv.setUint32(38, 0, true);
+      cdv.setUint32(42, offset, true);
+      cd.set(nameBytes, 46);
+      centralDirs.push(cd);
+      offset += local.length;
+    }
+
+    const cdOffset = offset;
+    const cdSize = centralDirs.reduce((a, b) => a + b.length, 0);
+    const eocd = new Uint8Array(22);
+    const ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(4, 0, true);
+    ev.setUint16(6, 0, true);
+    ev.setUint16(8, files.length, true);
+    ev.setUint16(10, files.length, true);
+    ev.setUint32(12, cdSize, true);
+    ev.setUint32(16, cdOffset, true);
+    ev.setUint16(20, 0, true);
+
+    const all = [...localHeaders, ...centralDirs, eocd];
+    const total = all.reduce((a, b) => a + b.length, 0);
+    const out = new Uint8Array(total);
+    let pos = 0;
+    for (const a of all) { out.set(a, pos); pos += a.length; }
+    return out;
+  }
+
+  function crc32(data) {
+    const table = crc32.table || (crc32.table = (() => {
+      const t = new Uint32Array(256);
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        t[i] = c;
+      }
+      return t;
+    })());
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < data.length; i++) c = table[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  const zipBytes = makeZip([
+    ['[Content_Types].xml', contentTypesXml],
+    ['_rels/.rels', relsXml],
+    ['word/document.xml', docXml],
+    ['word/_rels/document.xml.rels', wordRelsXml],
+  ]);
+
+  return new Blob([zipBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
+// ─────────────────────────────────────────
+// SEND
+// ─────────────────────────────────────────
+async function generateDocx() {
   if (!studentInfo.names.trim()) {
     setStatus('Please enter student name(s) before sending.', '#c0622a');
     return;
@@ -856,16 +974,18 @@ async function generateDocx(mode) {
     return;
   }
 
-  const safeName = studentInfo.names.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
-  const filename = `${studentInfo.class}_${safeName}_${currentStory.title.replace(/\s+/g, '_')}.docx`;
-
   const btn = document.querySelector('.download-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
-  setStatus('Uploading to teacher\'s folder...', 'var(--muted)');
+  setStatus('Building document...', 'var(--muted)');
 
   try {
+    const blob = await buildDocxBlob();
+    const safeName = studentInfo.names.trim().replace(/[^a-zA-Z0-9_ -]/g, '').replace(/\s+/g, '_');
+    const filename = `${studentInfo.class}_${safeName}_${currentStory.title.replace(/\s+/g, '_')}.docx`;
+
+    setStatus('Uploading to teacher's folder...', 'var(--muted)');
     await uploadToDrive(blob, filename);
-    setStatus('Sent! Your teacher will print it for you.', 'var(--green)');
+    setStatus('✓ Sent! Your teacher will print it for you.', 'var(--green)');
   } catch (err) {
     setStatus('Something went wrong: ' + err.message, '#c0622a');
     console.error(err);
