@@ -454,19 +454,21 @@ const STORIES = [
         { type:'dialog', speaker:'{wolf} Wolf', parts:[ 'Little pig! Open the door!' ] },
         { type:'dialog', speaker:'{p1} Piggy', parts:[ 'No! No! No!' ] },
         { type:'dialog', speaker:'{wolf} Wolf', parts:[ 'Then I will ', {k:'verb'}, ' your house down!' ] },
-        { type:'stage', parts:[ 'The house falls! ', {k:'p1'}, ' Piggy runs to ', {k:'p2'}, " Piggy's house. ", {k:'wolf'}, ' Wolf comes again.' ] },
+        { type:'stage', parts:[ 'The house falls! ', {k:'p1'}, ' Piggy runs to ', {k:'p2'}, " Piggy's strong house made of ", {k:'mat2'}, '. ', {k:'wolf'}, ' Wolf comes again.' ] },
         { type:'dialog', speaker:'{wolf} Wolf', parts:[ 'Little pig! Open the door!' ] },
-        { type:'dialog', speaker:'{p1} Piggy', parts:[ 'No! No! No!' ] },
+        { type:'dialog', speaker:'{p2} Piggy', parts:[ 'No! No! No!' ] },
         { type:'dialog', speaker:'{wolf} Wolf', parts:[ 'Then I will ', {k:'verb'}, ' your house down, too!' ] },
-        { type:'stage', parts:[ 'The second house falls too! ', {k:'p1'}, ' Piggy and ', {k:'p2'}, ' Piggy run to ', {k:'p3'}, " Piggy's house." ] },
+        { type:'stage', parts:[ 'The second house falls too! ', {k:'p1'}, ' Piggy and ', {k:'p2'}, ' Piggy run to ', {k:'p3'}, " Piggy's strong house made of ", {k:'mat3'}, '.' ] },
       ]},
       { label: "Scene 3 — The strong house", lines: [
-        { type:'stage', parts:[ {k:'wolf'}, " Wolf comes to ", {k:'p3'}, " Piggy's strong house." ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' Wolf comes to ', {k:'p3'}, " Piggy's strong house made of ", {k:'mat3'}, '.' ] },
         { type:'dialog', speaker:'{wolf} Wolf', parts:[ 'Open the door!' ] },
         { type:'dialog', speaker:'{p3} Piggy', parts:[ 'No! My house is very strong!' ] },
         { type:'stage', parts:[ {k:'wolf'}, ' Wolf tries and tries. The house does not fall.' ] },
         { type:'dialog', speaker:'{wolf} Wolf', parts:[ 'I will go down the chimney!' ] },
-        { type:'stage', parts:[ {k:'wolf'}, ' Wolf climbs down the chimney and falls into the ', {k:'fall'}, ' and runs away forever!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' Wolf climbs down the chimney and falls into the ', {k:'fall'}, '!' ] },
+        { type:'dialog', speaker:'{wolf} Wolf', parts:[ 'AHHHH!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' Wolf runs away forever!' ] },
         { type:'dialog', speaker:'{p3} Piggy', parts:[ 'We are safe! We are happy!' ] },
         { type:'stage', parts:[ 'The three pigs live together in ', {k:'p3'}, " Piggy's strong house. They are very happy." ] },
         { type:'dialog', speaker:'All Pigs', parts:[ 'We are safe! We are happy! Goodbye, ', {k:'wolf'}, ' Wolf!' ] },
@@ -694,12 +696,10 @@ function resolve(parts, forPreview) {
 
 function resolveSpeaker(speaker) {
   if (!speaker) return '';
-  const match = speaker.match(/^\{(\w+)\}$/);
-  if (match) {
-    const val = fieldValues[match[1]] && fieldValues[match[1]].trim();
-    return val || `_____________`;
-  }
-  return speaker;
+  // Replace all {key} tokens in speaker string with field values
+  return speaker.replace(/\{(\w+)\}/g, function(_, k) {
+    return (fieldValues[k] && fieldValues[k].trim()) || '_____________';
+  });
 }
 
 // ─────────────────────────────────────────
@@ -879,9 +879,9 @@ function buildDocXml() {
 
   function speakerText(speaker) {
     if (!speaker) return '';
-    const m = speaker.match(/^\{(\w+)\}$/);
-    if (m) return val(m[1]) || BLANK;
-    return speaker;
+    return speaker.replace(/\{(\w+)\}/g, function(_, k) {
+      return val(k) || BLANK;
+    });
   }
 
   let body = '';
