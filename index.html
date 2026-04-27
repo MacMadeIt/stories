@@ -5,25 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Story Script Maker</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<script>
-// Load docx library with fallback
-function loadDocx(urls, index) {
-  if (index >= urls.length) {
-    console.error('All docx CDN sources failed');
-    return;
-  }
-  const s = document.createElement('script');
-  s.src = urls[index];
-  s.onload = () => console.log('docx loaded from', urls[index]);
-  s.onerror = () => { console.warn('Failed:', urls[index]); loadDocx(urls, index + 1); };
-  document.head.appendChild(s);
-}
-loadDocx([
-  'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js',
-  'https://unpkg.com/docx@8.5.0/build/index.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/index.js'
-], 0);
-</script>
+<script src="docx.js"></script>
 <style>
   :root {
     --cream: #fdf8f0;
@@ -269,6 +251,48 @@ loadDocx([
   }
 
   .placeholder-msg span { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+
+  /* Student info card */
+  .info-card {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .info-card h3 {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 520px) { .info-grid { grid-template-columns: 1fr; } }
+  .info-card .field select {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.92rem;
+    color: var(--text);
+    background: var(--cream);
+    outline: none;
+    transition: border-color 0.15s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238c7560' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 2rem;
+  }
+  .info-card .field select:focus { border-color: var(--accent); background-color: white; }
+  .required-note { font-size: 0.75rem; color: var(--accent); margin-top: 0.5rem; }
 </style>
 </head>
 <body>
@@ -534,6 +558,7 @@ const STORIES = [
 // ─────────────────────────────────────────
 let currentStory = null;
 let fieldValues = {};
+let studentInfo = { names: '', class: '' };
 
 // ─────────────────────────────────────────
 // RENDER STORY PICKER
@@ -604,6 +629,29 @@ function renderForm() {
   `).join('');
 
   area.innerHTML = `
+    <div class="info-card">
+      <h3>Student Information</h3>
+      <div class="info-grid">
+        <div class="field">
+          <label>Student name(s)</label>
+          <input type="text" maxlength="60" placeholder="e.g. Amy, Tom"
+                 value="${studentInfo.names}"
+                 oninput="studentInfo.names = this.value" />
+          <span class="hint-tag">name</span>
+        </div>
+        <div class="field">
+          <label>Class</label>
+          <select onchange="studentInfo.class = this.value">
+            <option value="" ${!studentInfo.class ? 'selected' : ''}>Select class...</option>
+            ${['IO1','IO2','IO3','IO4','IO5','IO6','OD2','OD3','OD4','OD5','OD6']
+              .map(c => `<option value="${c}" ${studentInfo.class === c ? 'selected' : ''}>${c}</option>`)
+              .join('')}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+      </div>
+    </div>
+
     <div class="form-card">
       <h2>${currentStory.emoji} ${currentStory.title}</h2>
       <p class="story-desc">${currentStory.desc}</p>
@@ -755,13 +803,21 @@ async function generateDocx(mode) {
   const children = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 100 },
+      spacing: { before: 0, after: 80 },
       children: [new TextRun({ text: currentStory.title, font: FONT, size: 36, bold: true })]
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 280 },
+      spacing: { before: 0, after: 60 },
       children: [new TextRun({ text: 'Read your new story!', font: FONT, size: SH, italics: true, color: '888888' })]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 220 },
+      children: [
+        new TextRun({ text: `${studentInfo.class}  ·  `, font: FONT, size: SH, color: '888888' }),
+        new TextRun({ text: studentInfo.names.trim(), font: FONT, size: SH, bold: true, color: '444444' }),
+      ]
     }),
   ];
 
@@ -789,7 +845,19 @@ async function generateDocx(mode) {
   });
 
   const blob = await Packer.toBlob(doc);
-  const filename = currentStory.title.replace(/\s+/g, '_') + '_script.docx';
+
+  // Validate student info
+  if (!studentInfo.names.trim()) {
+    setStatus('Please enter student name(s) before sending.', '#c0622a');
+    return;
+  }
+  if (!studentInfo.class) {
+    setStatus('Please select a class before sending.', '#c0622a');
+    return;
+  }
+
+  const safeName = studentInfo.names.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+  const filename = `${studentInfo.class}_${safeName}_${currentStory.title.replace(/\s+/g, '_')}.docx`;
 
   const btn = document.querySelector('.download-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
