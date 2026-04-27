@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story Script Maker</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<style>
+  :root {
+    --cream: #fdf8f0;
+    --warm: #f5ede0;
+    --border: #e2d5c3;
+    --text: #2c1f0e;
+    --muted: #8c7560;
+    --accent: #c0622a;
+    --accent-light: #f7ece3;
+    --green: #3a6b45;
+    --green-light: #eaf3ec;
+    --blue: #2a5280;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--cream);
+    color: var(--text);
+    font-family: 'Nunito', sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--text);
+    color: var(--cream);
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  header p {
+    font-size: 0.85rem;
+    opacity: 0.6;
+    font-weight: 400;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  /* Story picker */
+  .story-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 2rem;
+  }
+
+  .story-btn {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--muted);
+    transition: all 0.15s;
+    line-height: 1.3;
+  }
+
+  .story-btn span {
+    display: block;
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+  }
+
+  .story-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .story-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  /* Form area */
+  .form-card {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .form-card h2 {
+    font-family: 'Crimson Pro', serif;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .form-card .story-desc {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  @media (max-width: 520px) {
+    .fields-grid { grid-template-columns: 1fr; }
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+
+  .field input {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.92rem;
+    color: var(--text);
+    background: var(--cream);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus {
+    border-color: var(--accent);
+    background: white;
+  }
+
+  .field input::placeholder { color: #bbb; }
+
+  .hint-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    background: var(--warm);
+    color: var(--muted);
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-top: 4px;
+  }
+
+  /* Download button */
+  .download-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 1rem 1.75rem;
+    font-family: 'Nunito', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .download-btn:hover { background: #2d5437; }
+  .download-btn:active { transform: scale(0.98); }
+
+  .download-btn svg { flex-shrink: 0; }
+
+  /* Preview strip */
+  .preview-card {
+    background: var(--green-light);
+    border: 1.5px solid #c3dfc9;
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    font-family: 'Crimson Pro', serif;
+    font-size: 1rem;
+    line-height: 1.9;
+    color: var(--text);
+  }
+
+  .preview-card h3 {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 0.75rem;
+    font-family: 'Nunito', sans-serif;
+  }
+
+  .preview-scene {
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.75rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .filled { color: var(--accent); font-weight: 600; }
+  .blank-preview {
+    display: inline-block;
+    border-bottom: 1.5px solid var(--muted);
+    min-width: 60px;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.85em;
+  }
+
+  .stage-line { color: var(--muted); font-style: italic; font-size: 0.95em; }
+  .speaker { font-weight: 600; font-style: normal; color: var(--text); }
+
+  .placeholder-msg {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .placeholder-msg span { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Story Script Maker</h1>
+  <p>For ESL classrooms · Pre-A1 / A1 level</p>
+</header>
+
+<div class="container">
+
+  <div class="story-grid" id="storyPicker"></div>
+
+  <div id="formArea">
+    <div class="placeholder-msg">
+      <span>📖</span>
+      Choose a story above to get started!
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────
+// STORY DATA
+// Each story has: title, emoji, desc, fields[], scenes[]
+// scenes[]: { label, lines[] }
+// lines[]: { type: 'stage'|'dialog', speaker?, parts[] }
+// parts[]: string | { key: fieldKey }
+// ─────────────────────────────────────────
+
+const STORIES = [
+
+  {
+    id: 'lrrh',
+    emoji: '🐺',
+    title: 'Little Red Riding Hood',
+    desc: 'A girl walks through the forest to visit her grandmother.',
+    fields: [
+      { key: 'girl',   label: "Girl's name",      hint: 'name' },
+      { key: 'gran',   label: "Grandmother's name", hint: 'name' },
+      { key: 'wolf',   label: "Villain's name",    hint: 'name' },
+      { key: 'helper', label: "Helper's name",     hint: 'name' },
+      { key: 'place',  label: 'Where she walks',   hint: 'place' },
+      { key: 'home',   label: "Gran's home",        hint: 'place' },
+      { key: 'gift',   label: 'What she carries',  hint: 'noun' },
+      { key: 'verb',   label: 'How the villain moves', hint: 'verb' },
+    ],
+    scenes: [
+      { label: 'Scene 1 — At home', lines: [
+        { type:'stage', parts:[ {k:'girl'}, ' is at home. Her mother speaks.' ] },
+        { type:'dialog', speaker:'Mother', parts:[ {k:'girl'}, ', please take ', {k:'gift'}, ' to ', {k:'gran'}, '. She lives in ', {k:'home'}, '.' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ 'OK, Mum! I am ready. Goodbye!' ] },
+      ]},
+      { label: 'Scene 2 — In the forest', lines: [
+        { type:'stage', parts:[ {k:'girl'}, ' walks in ', {k:'place'}, '. ', {k:'wolf'}, ' ', {k:'verb'}, 's to her.' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'Hello! Where are you going?' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ 'I am going to ', {k:'gran'}, "'s house. She lives in ", {k:'home'}, '.' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'OK. Goodbye!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' ', {k:'verb'}, 's to ', {k:'home'}, ' first.' ] },
+      ]},
+      { label: "Scene 3 — At gran's house", lines: [
+        { type:'stage', parts:[ {k:'girl'}, ' knocks on the door.' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ {k:'gran'}, '! I am here! I have ', {k:'gift'}, ' for you!' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ '(pretending) Come in, come in!' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ {k:'gran'}, ', your eyes are very big!' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'Yes! I can see you better!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' jumps up! ', {k:'girl'}, ' screams. ', {k:'helper'}, ' ', {k:'verb'}, 's to the house.' ] },
+      ]},
+      { label: 'Scene 4 — The ending', lines: [
+        { type:'dialog', speaker:'{helper}', parts:[ 'Stop! Go away!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' runs away. ', {k:'gran'}, ' comes out. Everyone is happy.' ] },
+        { type:'dialog', speaker:'{gran}', parts:[ 'Thank you, ', {k:'helper'}, '! And thank you, ', {k:'girl'}, '! I love ', {k:'gift'}, '!' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ 'I love you, ', {k:'gran'}, '! Goodbye, ', {k:'place'}, '!' ] },
+      ]},
+    ]
+  },
+
+  {
+    id: 'pigs',
+    emoji: '🐷',
+    title: 'The Three Little Pigs',
+    desc: 'Three pigs build houses. A wolf tries to blow them down.',
+    fields: [
+      { key: 'wolf',  label: "Villain's name",  hint: 'name' },
+      { key: 'mat1',  label: "Pig 1's material", hint: 'noun' },
+      { key: 'mat2',  label: "Pig 2's material", hint: 'noun' },
+      { key: 'mat3',  label: "Pig 3's material", hint: 'noun' },
+      { key: 'place', label: 'Where they live',  hint: 'place' },
+      { key: 'verb',  label: "Wolf's action",    hint: 'verb' },
+      { key: 'thing', label: 'How wolf enters',  hint: 'noun (e.g. chimney)' },
+    ],
+    scenes: [
+      { label: 'Scene 1 — Building homes', lines: [
+        { type:'stage', parts:[ 'Three little pigs leave home. Each pig wants to build a house.' ] },
+        { type:'dialog', speaker:'Pig 1', parts:[ 'I will build my house with ', {k:'mat1'}, '.' ] },
+        { type:'dialog', speaker:'Pig 2', parts:[ 'I will build my house with ', {k:'mat2'}, '.' ] },
+        { type:'dialog', speaker:'Pig 3', parts:[ 'I will build my house with ', {k:'mat3'}, '. It is strong!' ] },
+      ]},
+      { label: 'Scene 2 — The wolf arrives', lines: [
+        { type:'stage', parts:[ {k:'wolf'}, ' walks to the first house in ', {k:'place'}, '.' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'Little pig! Open the door!' ] },
+        { type:'dialog', speaker:'Pig 1', parts:[ 'No! No! No!' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'Then I will ', {k:'verb'}, ' your house down!' ] },
+        { type:'stage', parts:[ 'The house falls! Pig 1 runs to Pig 2\'s house. ', {k:'wolf'}, ' comes again. The second house falls too!' ] },
+      ]},
+      { label: "Scene 3 — The strong house", lines: [
+        { type:'stage', parts:[ {k:'wolf'}, ' comes to Pig 3\'s strong house.' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'Open the door!' ] },
+        { type:'dialog', speaker:'Pig 3', parts:[ 'No! Our house is very strong!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' tries and tries. The house does not fall.' ] },
+        { type:'dialog', speaker:'{wolf}', parts:[ 'I will go down the ', {k:'thing'}, '!' ] },
+        { type:'stage', parts:[ {k:'wolf'}, ' falls in the fire and ', {k:'verb'}, 's away forever!' ] },
+        { type:'dialog', speaker:'Pig 3', parts:[ 'We are safe! We are happy!' ] },
+      ]},
+    ]
+  },
+
+  {
+    id: 'goldi',
+    emoji: '🐻',
+    title: 'Goldilocks and the Three Bears',
+    desc: 'A girl finds a house in the forest. Three bears live there!',
+    fields: [
+      { key: 'girl',  label: "Girl's name",    hint: 'name' },
+      { key: 'bear1', label: 'Big bear\'s name', hint: 'name' },
+      { key: 'bear2', label: 'Middle bear\'s name', hint: 'name' },
+      { key: 'bear3', label: 'Small bear\'s name',  hint: 'name' },
+      { key: 'place', label: 'Where she walks', hint: 'place' },
+      { key: 'food',  label: 'Food in the bowls', hint: 'noun' },
+      { key: 'verb',  label: 'How she leaves',  hint: 'verb' },
+    ],
+    scenes: [
+      { label: 'Scene 1 — The empty house', lines: [
+        { type:'stage', parts:[ {k:'girl'}, ' walks in ', {k:'place'}, '. She finds a small house.' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ 'Hello? Is anyone home?' ] },
+        { type:'stage', parts:[ 'No one is home. She goes inside.' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ 'I see three bowls of ', {k:'food'}, '!' ] },
+        { type:'stage', parts:[ 'She tries all three. The small bowl is perfect. She eats it all.' ] },
+      ]},
+      { label: 'Scene 2 — So tired!', lines: [
+        { type:'dialog', speaker:'{girl}', parts:[ 'This chair is too big! This chair is too hard! This chair is perfect!' ] },
+        { type:'stage', parts:[ 'The small chair breaks! She finds three beds. She sleeps in the small bed.' ] },
+      ]},
+      { label: 'Scene 3 — The bears come home', lines: [
+        { type:'stage', parts:[ {k:'bear1'}, ', ', {k:'bear2'}, ', and ', {k:'bear3'}, ' come home.' ] },
+        { type:'dialog', speaker:'{bear3}', parts:[ 'Someone ate my ', {k:'food'}, '!' ] },
+        { type:'dialog', speaker:'{bear3}', parts:[ 'Someone is in my bed!' ] },
+        { type:'stage', parts:[ {k:'girl'}, ' wakes up. She sees the bears and ', {k:'verb'}, 's out of the house fast!' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ 'Goodbye, ', {k:'place'}, '! I will not come back!' ] },
+      ]},
+    ]
+  },
+
+  {
+    id: 'jack',
+    emoji: '🫘',
+    title: 'Jack and the Beanstalk',
+    desc: 'A boy trades a cow for magic beans and climbs to a giant\'s castle.',
+    fields: [
+      { key: 'boy',     label: "Boy's name",       hint: 'name' },
+      { key: 'animal',  label: 'The animal he sells', hint: 'animal noun' },
+      { key: 'place1',  label: 'Market place',      hint: 'place' },
+      { key: 'place2',  label: 'Top of beanstalk',  hint: 'place' },
+      { key: 'treasure',label: "Giant's treasure",  hint: 'noun' },
+      { key: 'verb',    label: 'How boy moves',     hint: 'verb' },
+    ],
+    scenes: [
+      { label: 'Scene 1 — The magic beans', lines: [
+        { type:'stage', parts:[ {k:'boy'}, ' and his mother are poor. They have one ', {k:'animal'}, '.' ] },
+        { type:'dialog', speaker:'Mother', parts:[ 'Go to ', {k:'place1'}, '. Sell the ', {k:'animal'}, '!' ] },
+        { type:'stage', parts:[ {k:'boy'}, ' meets an old man. He gives magic beans for the ', {k:'animal'}, '.' ] },
+        { type:'dialog', speaker:'Mother', parts:[ 'Beans?! No money?!' ] },
+        { type:'stage', parts:[ 'Mother throws the beans out the window.' ] },
+      ]},
+      { label: 'Scene 2 — Up, up, up!', lines: [
+        { type:'stage', parts:[ 'In the morning, a big beanstalk is outside! ', {k:'boy'}, ' ', {k:'verb'}, 's up to ', {k:'place2'}, '.' ] },
+        { type:'dialog', speaker:'Giant', parts:[ 'Fee! Fi! Fo! Fum! Who is here?' ] },
+        { type:'stage', parts:[ {k:'boy'}, ' hides. The giant eats and then sleeps.' ] },
+      ]},
+      { label: 'Scene 3 — Run!', lines: [
+        { type:'stage', parts:[ {k:'boy'}, ' takes the giant\'s ', {k:'treasure'}, ' and ', {k:'verb'}, 's down the beanstalk.' ] },
+        { type:'dialog', speaker:'Giant', parts:[ 'Stop! Come back!' ] },
+        { type:'stage', parts:[ {k:'boy'}, ' cuts the beanstalk. The giant falls. ', {k:'boy'}, ' and his mother are happy!' ] },
+      ]},
+    ]
+  },
+
+  {
+    id: 'cinderella',
+    emoji: '👠',
+    title: 'Cinderella',
+    desc: 'A kind girl goes to a royal party with help from a fairy.',
+    fields: [
+      { key: 'girl',    label: "Girl's name",      hint: 'name' },
+      { key: 'family',  label: 'Unkind family member', hint: 'noun' },
+      { key: 'chore',   label: 'A chore to do',    hint: 'noun (e.g. floor)' },
+      { key: 'outfit',  label: 'Her magic outfit',  hint: 'noun (e.g. dress)' },
+      { key: 'place',   label: 'Party place',       hint: 'place' },
+      { key: 'time',    label: 'Magic ends at',     hint: 'time (e.g. midnight)' },
+      { key: 'verb',    label: 'How she dances',    hint: 'verb' },
+    ],
+    scenes: [
+      { label: 'Scene 1 — At home', lines: [
+        { type:'stage', parts:[ {k:'girl'}, ' lives with her ', {k:'family'}, '. She works every day.' ] },
+        { type:'dialog', speaker:'{family}', parts:[ 'Clean the ', {k:'chore'}, '! You cannot go to the party!' ] },
+        { type:'dialog', speaker:'{girl}', parts:[ 'I want to go. I am so sad.' ] },
+      ]},
+      { label: 'Scene 2 — A magic visitor', lines: [
+        { type:'stage', parts:[ 'A fairy godmother appears!' ] },
+        { type:'dialog', speaker:'Fairy', parts:[ 'Do not cry, ', {k:'girl'}, '! I can help you!' ] },
+        { type:'stage', parts:[ 'The fairy waves her wand. A beautiful ', {k:'outfit'}, ' appears!' ] },
+        { type:'dialog', speaker:'Fairy', parts:[ 'Go to the party! But come home before ', {k:'time'}, '!' ] },
+      ]},
+      { label: 'Scene 3 — The party', lines: [
+        { type:'stage', parts:[ {k:'girl'}, ' arrives at ', {k:'place'}, '. Everyone looks at her.' ] },
+        { type:'dialog', speaker:'Prince', parts:[ 'You are beautiful! Can you ', {k:'verb'}, ' with me?' ] },
+        { type:'stage', parts:[ 'They dance. The clock rings! ', {k:'girl'}, ' runs away and drops her shoe.' ] },
+        { type:'stage', parts:[ 'The prince finds ', {k:'girl'}, ' with the shoe. They are happy forever!' ] },
+      ]},
+    ]
+  },
+
+  {
+    id: 'duckling',
+    emoji: '🦢',
+    title: 'The Ugly Duckling',
+    desc: 'A different baby bird feels alone, but finds where it belongs.',
+    fields: [
+      { key: 'duck',    label: "Duckling's name",   hint: 'name' },
+      { key: 'place1',  label: 'Where it is born',  hint: 'place' },
+      { key: 'place2',  label: 'Where it goes alone', hint: 'place' },
+      { key: 'adj',     label: 'How others describe it', hint: 'adjective' },
+      { key: 'person',  label: 'Kind helper',        hint: 'noun (e.g. farmer)' },
+      { key: 'bird',    label: 'What it becomes',    hint: 'noun (e.g. swan)' },
+      { key: 'verb',    label: 'How it moves',       hint: 'verb (e.g. swim)' },
+    ],
+    scenes: [
+      { label: 'Scene 1 — A different egg', lines: [
+        { type:'stage', parts:[ 'A mother duck sits on her eggs in ', {k:'place1'}, '. One baby is very different.' ] },
+        { type:'dialog', speaker:'Duck 1', parts:[ 'You are ', {k:'adj'}, '! You are not like us! Go away!' ] },
+        { type:'stage', parts:[ {k:'duck'}, ' is very sad. It ', {k:'verb'}, 's away alone.' ] },
+      ]},
+      { label: 'Scene 2 — A long winter', lines: [
+        { type:'stage', parts:[ {k:'duck'}, ' walks to ', {k:'place2'}, '. It is cold and lonely.' ] },
+        { type:'dialog', speaker:'{duck}', parts:[ 'I have no friends. Nobody likes me.' ] },
+        { type:'stage', parts:[ 'A kind ', {k:'person'}, ' finds ', {k:'duck'}, ' and gives it food and a warm place.' ] },
+        { type:'dialog', speaker:'{duck}', parts:[ 'Thank you. You are very kind.' ] },
+      ]},
+      { label: 'Scene 3 — A big surprise', lines: [
+        { type:'stage', parts:[ 'Spring comes. ', {k:'duck'}, ' ', {k:'verb'}, 's to the river and sees its reflection.' ] },
+        { type:'dialog', speaker:'{duck}', parts:[ 'I am... beautiful? I am a ', {k:'bird'}, '!' ] },
+        { type:'dialog', speaker:'Bird', parts:[ 'Come with us! You are one of us!' ] },
+        { type:'stage', parts:[ {k:'duck'}, ' is happy at last. It was never ugly. It was just different!' ] },
+      ]},
+    ]
+  },
+
+];
+
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+let currentStory = null;
+let fieldValues = {};
+
+// ─────────────────────────────────────────
+// RENDER STORY PICKER
+// ─────────────────────────────────────────
+function renderPicker() {
+  const grid = document.getElementById('storyPicker');
+  grid.innerHTML = STORIES.map(s => `
+    <button class="story-btn ${currentStory && currentStory.id === s.id ? 'active' : ''}"
+            onclick="selectStory('${s.id}')">
+      <span>${s.emoji}</span>${s.title}
+    </button>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+// SELECT STORY
+// ─────────────────────────────────────────
+function selectStory(id) {
+  currentStory = STORIES.find(s => s.id === id);
+  fieldValues = {};
+  renderPicker();
+  renderForm();
+}
+
+// ─────────────────────────────────────────
+// RESOLVE TEXT (replaces {k} with value or blank)
+// ─────────────────────────────────────────
+function resolve(parts, forPreview) {
+  return parts.map(p => {
+    if (typeof p === 'string') return p;
+    const k = p.k;
+    const val = fieldValues[k] && fieldValues[k].trim();
+    if (forPreview) {
+      return val
+        ? `<span class="filled">${val}</span>`
+        : `<span class="blank-preview">${currentStory.fields.find(f=>f.key===k)?.hint || '...'}</span>`;
+    }
+    return val || `_____________`;
+  }).join('');
+}
+
+function resolveSpeaker(speaker) {
+  if (!speaker) return '';
+  const match = speaker.match(/^\{(\w+)\}$/);
+  if (match) {
+    const val = fieldValues[match[1]] && fieldValues[match[1]].trim();
+    return val || `_____________`;
+  }
+  return speaker;
+}
+
+// ─────────────────────────────────────────
+// RENDER FORM + PREVIEW
+// ─────────────────────────────────────────
+function renderForm() {
+  const area = document.getElementById('formArea');
+  if (!currentStory) return;
+
+  const fieldsHtml = currentStory.fields.map(f => `
+    <div class="field">
+      <label>${f.label}</label>
+      <input type="text" maxlength="24" placeholder="Type here..."
+             data-key="${f.key}"
+             value="${fieldValues[f.key] || ''}"
+             oninput="updateField('${f.key}', this.value)" />
+      <span class="hint-tag">${f.hint}</span>
+    </div>
+  `).join('');
+
+  area.innerHTML = `
+    <div class="form-card">
+      <h2>${currentStory.emoji} ${currentStory.title}</h2>
+      <p class="story-desc">${currentStory.desc}</p>
+      <div class="fields-grid">${fieldsHtml}</div>
+    </div>
+
+    <div class="preview-card" id="previewCard">
+      <h3>Story preview</h3>
+      ${renderPreviewLines()}
+    </div>
+
+    <button class="download-btn" onclick="generateDocx('send')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/>
+      </svg>
+      Send to Teacher
+    </button>
+    <div id="statusMsg" style="margin-top:12px; text-align:center; font-size:0.85rem; min-height:1.4em;"></div>
+  `;
+}
+
+function renderPreviewLines() {
+  return currentStory.scenes.map(scene => `
+    <div class="preview-scene">${scene.label}</div>
+    ${scene.lines.map(line => {
+      if (line.type === 'stage') {
+        return `<div class="stage-line">(${resolve(line.parts, true)})</div>`;
+      } else {
+        const spk = resolveSpeaker(line.speaker);
+        return `<div><span class="speaker">${spk}:</span> ${resolve(line.parts, true)}</div>`;
+      }
+    }).join('')}
+  `).join('');
+}
+
+function updateField(key, value) {
+  fieldValues[key] = value;
+  const preview = document.getElementById('previewCard');
+  if (preview) {
+    preview.innerHTML = '<h3>Story preview</h3>' + renderPreviewLines();
+  }
+}
+
+// ─────────────────────────────────────────
+// GOOGLE DRIVE CONFIG
+// ─────────────────────────────────────────
+const DRIVE_API_KEY   = 'AIzaSyBz_pPEsGEUi3B4RvHBpFn8259kSYre02M';
+const DRIVE_FOLDER_ID = '1KuYghLpECstAnn7BUyiypuiSlyimEx8a';
+
+function setStatus(msg, color) {
+  const el = document.getElementById('statusMsg');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--muted)'; }
+}
+
+async function uploadToDrive(blob, filename) {
+  // Step 1: initiate resumable upload to get upload URL
+  const meta = JSON.stringify({ name: filename, parents: [DRIVE_FOLDER_ID] });
+  const initRes = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${DRIVE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/related; boundary=boundary_string' },
+      body: `--boundary_string\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--boundary_string\r\nContent-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document\r\n\r\n`,
+    }
+  );
+
+  // Use multipart upload properly
+  const formData = new FormData();
+  formData.append('metadata', new Blob([meta], { type: 'application/json' }));
+  formData.append('file', blob, filename);
+
+  const res = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${DRIVE_API_KEY}`,
+    { method: 'POST', body: formData }
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || 'Upload failed');
+  }
+  return await res.json();
+}
+
+// ─────────────────────────────────────────
+// GENERATE DOCX
+// ─────────────────────────────────────────
+async function generateDocx(mode) {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, UnderlineType, BorderStyle } = docx;
+
+  const FONT = "Arial";
+  const SB = 22, SH = 16, SS = 18;
+  const BLANK = "_____________";
+
+  function blankOrValue(key) {
+    const val = fieldValues[key] && fieldValues[key].trim();
+    if (val) return [new TextRun({ text: val, font: FONT, size: SB, bold: true })];
+    return [new TextRun({ text: '  ' + BLANK + '  ', underline: { type: UnderlineType.SINGLE }, font: FONT, size: SB })];
+  }
+
+  function plain(text) {
+    return new TextRun({ text, font: FONT, size: SB });
+  }
+
+  function buildRuns(parts) {
+    return parts.flatMap(p => {
+      if (typeof p === 'string') return [plain(p)];
+      return blankOrValue(p.k);
+    });
+  }
+
+  function scenePara(label) {
+    return new Paragraph({
+      spacing: { before: 200, after: 60 },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC', space: 3 } },
+      children: [new TextRun({ text: label, font: FONT, size: SS, bold: true, color: '444444' })]
+    });
+  }
+
+  function stagePara(parts) {
+    return new Paragraph({
+      spacing: { before: 50, after: 50 },
+      children: [
+        new TextRun({ text: '(', font: FONT, size: SB, italics: true, color: '666666' }),
+        ...buildRuns(parts).map(r => { r._data.options.italics = true; r._data.options.color = r._data.options.bold ? '333333' : '666666'; return r; }),
+        new TextRun({ text: ')', font: FONT, size: SB, italics: true, color: '666666' }),
+      ]
+    });
+  }
+
+  function dialogPara(speaker, parts) {
+    const spkText = resolveSpeaker(speaker) || '';
+    return new Paragraph({
+      spacing: { before: 50, after: 50 },
+      children: [
+        new TextRun({ text: spkText + ': ', font: FONT, size: SB, bold: true }),
+        ...buildRuns(parts),
+      ]
+    });
+  }
+
+  const children = [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 100 },
+      children: [new TextRun({ text: currentStory.title, font: FONT, size: 36, bold: true })]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 280 },
+      children: [new TextRun({ text: 'Read your new story!', font: FONT, size: SH, italics: true, color: '888888' })]
+    }),
+  ];
+
+  for (const scene of currentStory.scenes) {
+    children.push(scenePara(scene.label));
+    for (const line of scene.lines) {
+      if (line.type === 'stage') {
+        children.push(stagePara(line.parts));
+      } else {
+        children.push(dialogPara(line.speaker, line.parts));
+      }
+    }
+  }
+
+  const doc = new Document({
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 },
+          margin: { top: 900, right: 900, bottom: 900, left: 900 }
+        }
+      },
+      children
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const filename = currentStory.title.replace(/\s+/g, '_') + '_script.docx';
+
+  const btn = document.querySelector('.download-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+  setStatus('Uploading to teacher\'s folder...', 'var(--muted)');
+
+  try {
+    await uploadToDrive(blob, filename);
+    setStatus('Sent! Your teacher will print it for you.', 'var(--green)');
+  } catch (err) {
+    setStatus('Something went wrong: ' + err.message, '#c0622a');
+    console.error(err);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg> Send to Teacher`;
+    }
+  }
+}
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+renderPicker();
+</script>
+</body>
+</html>
