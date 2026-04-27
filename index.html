@@ -5,7 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Story Script Maker</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script>
+// Load docx library with fallback
+function loadDocx(urls, index) {
+  if (index >= urls.length) {
+    console.error('All docx CDN sources failed');
+    return;
+  }
+  const s = document.createElement('script');
+  s.src = urls[index];
+  s.onload = () => console.log('docx loaded from', urls[index]);
+  s.onerror = () => { console.warn('Failed:', urls[index]); loadDocx(urls, index + 1); };
+  document.head.appendChild(s);
+}
+loadDocx([
+  'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js',
+  'https://unpkg.com/docx@8.5.0/build/index.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/index.js'
+], 0);
+</script>
 <style>
   :root {
     --cream: #fdf8f0;
@@ -671,6 +689,16 @@ async function uploadToDrive(blob, filename) {
 // GENERATE DOCX
 // ─────────────────────────────────────────
 async function generateDocx(mode) {
+  // Wait for docx library to be available (up to 10 seconds)
+  let waited = 0;
+  while (typeof docx === 'undefined' && waited < 10000) {
+    await new Promise(r => setTimeout(r, 200));
+    waited += 200;
+  }
+  if (typeof docx === 'undefined') {
+    setStatus('Error: script library failed to load. Please refresh the page and try again.', '#c0622a');
+    return;
+  }
   const { Document, Packer, Paragraph, TextRun, AlignmentType, UnderlineType, BorderStyle } = docx;
 
   const FONT = "Arial";
