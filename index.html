@@ -319,7 +319,7 @@
 // STORY DATA
 // Each story has: title, emoji, desc, fields[], scenes[]
 // scenes[]: { label, lines[] }
-// lines[]: { type: 'stage'|'dialog', speaker?, parts[] }
+// lines[]: { type: 'stage' or 'dialog', speaker (optional), parts[] }
 // parts[]: string | { key: fieldKey }
 // ─────────────────────────────────────────
 
@@ -593,7 +593,7 @@ function resolve(parts, forPreview) {
     if (forPreview) {
       return val
         ? `<span class="filled">${val}</span>`
-        : `<span class="blank-preview">${currentStory.fields.find(f=>f.key===k)?.hint || '...'}</span>`;
+        : `<span class="blank-preview">${currentStory.fields.find(function(f){return f.key===k}) ? currentStory.fields.find(function(f){return f.key===k}).hint : "" || '...'}</span>`;
     }
     return val || `_____________`;
   }).join('');
@@ -976,18 +976,18 @@ async function generateDocx() {
 
   const btn = document.querySelector('.download-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
-  setStatus('Building document...', 'var(--muted)');
+  setStatus("Building document...", "var(--muted)");
 
   try {
     const blob = await buildDocxBlob();
     const safeName = studentInfo.names.trim().replace(/[^a-zA-Z0-9_ -]/g, '').replace(/\s+/g, '_');
     const filename = `${studentInfo.class}_${safeName}_${currentStory.title.replace(/\s+/g, '_')}.docx`;
 
-    setStatus('Uploading to teacher's folder...', 'var(--muted)');
+    setStatus("Uploading to teacher folder...", "var(--muted)");
     await uploadToDrive(blob, filename);
     setStatus('✓ Sent! Your teacher will print it for you.', 'var(--green)');
   } catch (err) {
-    setStatus('Something went wrong: ' + err.message, '#c0622a');
+    setStatus("Something went wrong: " + err.message, "#c0622a");
     console.error(err);
   } finally {
     if (btn) {
