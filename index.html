@@ -102,6 +102,66 @@
   .badge-b1  { background: #f3e8fd; color: #5a2d82; }
   .badge-b2  { background: #fde8f0; color: #8a1a40; }
 
+  /* AI Story Builder tab */
+  .ai-tab { background: linear-gradient(135deg, #2a5280, #3a6b45) !important; color: white !important; border-color: transparent !important; }
+  .ai-tab:hover { opacity: 0.88; color: white !important; }
+  .ai-tab.active { outline: 3px solid #2a5280; outline-offset: 2px; }
+
+  .ai-builder {
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .ai-builder h2 { font-family: "Crimson Pro", serif; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .ai-builder .story-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.5rem; }
+  .ai-section-title {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 1.5rem 0 0.75rem; padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .ai-full { grid-column: 1 / -1; }
+  .ai-textarea {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 0.6rem 0.75rem; font-family: "Nunito", sans-serif;
+    font-size: 0.92rem; color: var(--text); background: var(--cream);
+    outline: none; resize: vertical; min-height: 70px;
+    transition: border-color 0.15s; line-height: 1.5;
+  }
+  .ai-textarea:focus { border-color: var(--accent); background: white; }
+  .ai-textarea::placeholder { color: #bbb; }
+  .char-count { font-size: 0.7rem; color: var(--muted); text-align: right; margin-top: 3px; }
+  .required-star { color: var(--accent); margin-left: 2px; }
+  .prompt-box {
+    background: var(--cream); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem 1.5rem;
+    font-size: 0.88rem; line-height: 1.8; color: var(--text);
+    white-space: pre-wrap; margin-bottom: 1rem; min-height: 100px;
+    font-family: "Nunito", sans-serif;
+  }
+  .prompt-box.empty { color: var(--muted); font-style: italic; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .generate-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    gap: 8px; background: var(--accent); color: white; border: none;
+    border-radius: var(--radius); padding: 0.9rem 1.5rem;
+    font-family: "Nunito", sans-serif; font-size: 0.95rem; font-weight: 700;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .generate-btn:hover { background: #a8531f; }
+  .copy-btn {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; background: var(--green); color: white; border: none;
+    border-radius: var(--radius); padding: 0.9rem 1.5rem;
+    font-family: "Nunito", sans-serif; font-size: 0.95rem; font-weight: 700;
+    cursor: pointer; transition: background 0.15s; min-width: 160px;
+  }
+  .copy-btn:hover { background: #2d5437; }
+  .copy-btn:disabled { background: #aaa; cursor: default; }
+  .char-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 0.5rem; }
+
   /* Story picker */
   .story-grid {
     display: grid;
@@ -659,16 +719,272 @@ let currentLevel = 'All';
 // ─────────────────────────────────────────
 // RENDER STORY PICKER
 // ─────────────────────────────────────────
-const LEVELS = ['All', 'Pre-A1', 'A1', 'A2', 'B1', 'B2'];
+const LEVELS = ['All', 'Pre-A1', 'A1', 'A2', 'B1', 'B2', '✨ AI Story Builder'];
 const BADGE_CLASS = { 'Pre-A1': 'badge-pre', 'A1': 'badge-a1', 'A2': 'badge-a2', 'B1': 'badge-b1', 'B2': 'badge-b2' };
+
+// ─────────────────────────────────────────
+// AI STORY BUILDER STATE
+// ─────────────────────────────────────────
+let aiState = {
+  names: '', class: '',
+  wordCount: '', storyType: '', level: '',
+  perspective: '', tone: '',
+  numChars: '2', charNames: ['', ''],
+  mainIdea: '', setting: '', problem: '',
+  detail1: '', detail2: '', detail3: '',
+  conclusion: ''
+};
+let generatedPrompt = '';
+
+function renderAIBuilder() {
+  const area = document.getElementById('formArea');
+  const classOptions = ['IO1','IO2','IO3','IO4','IO5','IO6','OD2','OD3','OD4','OD5','OD6','Other']
+    .map(c => `<option value="${c}" ${aiState.class === c ? 'selected' : ''}>${c}</option>`).join('');
+
+  const charCount = parseInt(aiState.numChars) || 2;
+  const charFields = Array.from({length: charCount}, (_, i) => `
+    <div class="field">
+      <label>Character ${i+1} Name <span class="required-star">*</span></label>
+      <input type="text" maxlength="30" placeholder="e.g. Sofia"
+             value="${aiState.charNames[i] || ''}"
+             oninput="aiState.charNames[${i}] = this.value" />
+    </div>`).join('');
+
+  area.innerHTML = `
+    <div class="ai-builder">
+      <h2>✨ AI Story Builder</h2>
+      <p class="story-desc">Fill in the details below, generate your prompt, then paste it into Claude, ChatGPT, or any AI assistant to create your story!</p>
+
+      <div class="ai-section-title">About you</div>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Your name(s) <span class="required-star">*</span></label>
+          <input type="text" maxlength="60" placeholder="e.g. Amy, Tom"
+                 value="${aiState.names}"
+                 oninput="aiState.names = this.value" />
+          <span class="hint-tag">name</span>
+        </div>
+        <div class="field">
+          <label>Class <span class="required-star">*</span></label>
+          <select onchange="aiState.class = this.value">
+            <option value="">Select class...</option>
+            ${classOptions}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+      </div>
+
+      <div class="ai-section-title">Story settings</div>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Story type <span class="required-star">*</span></label>
+          <select onchange="aiState.storyType = this.value">
+            <option value="">Choose type...</option>
+            ${['Play / Dialogue','Short Story','Persuasive Article','Descriptive Writing','Letter or Email']
+              .map(t => `<option value="${t}" ${aiState.storyType === t ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+        <div class="field">
+          <label>Word count <span class="required-star">*</span></label>
+          <select onchange="aiState.wordCount = this.value">
+            <option value="">Choose length...</option>
+            ${['50–100 words','100–150 words','150–200 words','200–300 words','300–400 words']
+              .map(w => `<option value="${w}" ${aiState.wordCount === w ? 'selected' : ''}>${w}</option>`).join('')}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+        <div class="field">
+          <label>Language level <span class="required-star">*</span></label>
+          <select onchange="aiState.level = this.value">
+            <option value="">Choose level...</option>
+            ${['Pre-A1','A1','A2','B1','B2']
+              .map(l => `<option value="${l}" ${aiState.level === l ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+        <div class="field">
+          <label>Tone / mood <span class="required-star">*</span></label>
+          <select onchange="aiState.tone = this.value">
+            <option value="">Choose tone...</option>
+            ${['Funny and silly','Exciting and adventurous','Warm and heartwarming','Mysterious and suspenseful','Serious and thoughtful','Scary']
+              .map(t => `<option value="${t}" ${aiState.tone === t ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+        <div class="field">
+          <label>Perspective <span class="required-star">*</span></label>
+          <select onchange="aiState.perspective = this.value">
+            <option value="">Choose perspective...</option>
+            ${['First person (I / We)','Third person (He / She / They)',"Does not matter"]
+              .map(p => `<option value="${p}" ${aiState.perspective === p ? 'selected' : ''}>${p}</option>`).join('')}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+        <div class="field">
+          <label>Number of characters <span class="required-star">*</span></label>
+          <select onchange="aiState.numChars = this.value; renderAIBuilder()">
+            ${['1','2','3','4','5'].map(n =>
+              `<option value="${n}" ${aiState.numChars === n ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
+          <span class="hint-tag">required</span>
+        </div>
+      </div>
+
+      <div class="ai-section-title">Characters <span class="required-star">*</span></div>
+      <div class="char-fields">${charFields}</div>
+
+      <div class="ai-section-title">Your story</div>
+      <div class="fields-grid">
+        <div class="field ai-full">
+          <label>Main idea</label>
+          <textarea class="ai-textarea" maxlength="300" placeholder="Write 1–3 sentences about the main idea of your story. What is it mostly about?"
+                    oninput="aiState.mainIdea = this.value">${aiState.mainIdea}</textarea>
+          <div class="char-count"><span id="mi-count">${aiState.mainIdea.length}</span>/300</div>
+        </div>
+        <div class="field ai-full">
+          <label>Setting <span class="required-star">*</span></label>
+          <textarea class="ai-textarea" maxlength="200" placeholder="Where and when does the story take place? e.g. A small village in Japan, 100 years ago."
+                    oninput="aiState.setting = this.value; document.getElementById('set-count').textContent = this.value.length">${aiState.setting}</textarea>
+          <div class="char-count"><span id="set-count">${aiState.setting.length}</span>/200</div>
+        </div>
+        <div class="field ai-full">
+          <label>Problem or lesson <span class="required-star">*</span></label>
+          <textarea class="ai-textarea" maxlength="250" placeholder="What problem do the characters face? Or what lesson does the story teach?"
+                    oninput="aiState.problem = this.value; document.getElementById('prob-count').textContent = this.value.length">${aiState.problem}</textarea>
+          <div class="char-count"><span id="prob-count">${aiState.problem.length}</span>/250</div>
+        </div>
+      </div>
+
+      <div class="ai-section-title">Supporting details</div>
+      <div class="fields-grid">
+        ${[1,2,3].map(n => `
+        <div class="field ai-full">
+          <label>Detail ${n}</label>
+          <textarea class="ai-textarea" maxlength="250" placeholder="Describe something that happens in the story..."
+                    oninput="aiState.detail${n} = this.value; document.getElementById('d${n}-count').textContent = this.value.length">${aiState['detail'+n]}</textarea>
+          <div class="char-count"><span id="d${n}-count">${(aiState['detail'+n]||'').length}</span>/250</div>
+        </div>`).join('')}
+      </div>
+
+      <div class="ai-section-title">Ending</div>
+      <div class="fields-grid">
+        <div class="field ai-full">
+          <label>Conclusion</label>
+          <textarea class="ai-textarea" maxlength="250" placeholder="How does the story end? What happens to the characters?"
+                    oninput="aiState.conclusion = this.value; document.getElementById('con-count').textContent = this.value.length">${aiState.conclusion}</textarea>
+          <div class="char-count"><span id="con-count">${(aiState.conclusion||'').length}</span>/250</div>
+        </div>
+      </div>
+
+      <div class="ai-section-title">Your generated prompt</div>
+      <div class="prompt-box ${generatedPrompt ? '' : 'empty'}" id="promptBox">
+        ${generatedPrompt || 'Your prompt will appear here after you click Generate. Read it over and make any changes before copying!'}
+      </div>
+      <div class="btn-row">
+        <button class="generate-btn" onclick="generateAIPrompt()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Generate Prompt
+        </button>
+        <button class="copy-btn" id="copyBtn" onclick="copyPrompt()" ${generatedPrompt ? '' : 'disabled'}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy Prompt
+        </button>
+      </div>
+      <p style="font-size:0.75rem; color:var(--muted); margin-top:0.75rem;">Fields marked with <span class="required-star">*</span> are required. Other fields are optional — if left empty the AI will decide!</p>
+    </div>
+  `;
+
+  // attach char count for main idea after render
+  const miTextarea = area.querySelector('[placeholder*="main idea"]');
+  if (miTextarea) miTextarea.addEventListener('input', function() {
+    document.getElementById('mi-count').textContent = this.value.length;
+  });
+}
+
+function generateAIPrompt() {
+  // Validate required fields
+  const missing = [];
+  if (!aiState.names.trim()) missing.push('Your name');
+  if (!aiState.class) missing.push('Class');
+  if (!aiState.storyType) missing.push('Story type');
+  if (!aiState.wordCount) missing.push('Word count');
+  if (!aiState.level) missing.push('Language level');
+  if (!aiState.tone) missing.push('Tone / mood');
+  if (!aiState.perspective) missing.push('Perspective');
+  const charCount = parseInt(aiState.numChars) || 2;
+  const missingChars = Array.from({length: charCount}, (_, i) => aiState.charNames[i])
+    .filter(n => !n || !n.trim());
+  if (missingChars.length > 0) missing.push('All character names');
+  if (!aiState.setting.trim()) missing.push('Setting');
+  if (!aiState.problem.trim()) missing.push('Problem or lesson');
+
+  if (missing.length > 0) {
+    alert('Please fill in the required fields:\n\n' + missing.map(m => '• ' + m).join('\n'));
+    return;
+  }
+
+  const chars = Array.from({length: charCount}, (_, i) => aiState.charNames[i] || '').filter(Boolean);
+  const charList = chars.length === 1 ? chars[0] : chars.slice(0, -1).join(', ') + ' and ' + chars[chars.length - 1];
+
+  const optionals = [];
+  if (aiState.mainIdea.trim()) optionals.push('Main idea: ' + aiState.mainIdea.trim());
+  if (aiState.detail1.trim()) optionals.push('Story detail 1: ' + aiState.detail1.trim());
+  if (aiState.detail2.trim()) optionals.push('Story detail 2: ' + aiState.detail2.trim());
+  if (aiState.detail3.trim()) optionals.push('Story detail 3: ' + aiState.detail3.trim());
+  if (aiState.conclusion.trim()) optionals.push('Conclusion: ' + aiState.conclusion.trim());
+
+  const optionalSection = optionals.length > 0
+    ? '\n\nAdditional details provided by the student:\n' + optionals.map(o => '- ' + o).join('\n')
+    : '';
+
+  generatedPrompt = `Please write a ${aiState.storyType.toLowerCase()} for an ESL student at ${aiState.level} language level.
+
+Story requirements:
+- Length: ${aiState.wordCount}
+- Tone: ${aiState.tone}
+- Perspective: ${aiState.perspective}
+- Characters (${charCount}): ${charList}
+- Setting: ${aiState.setting.trim()}
+- Problem or lesson: ${aiState.problem.trim()}${optionalSection}
+
+Please make sure:
+- The vocabulary and grammar are appropriate for ${aiState.level} level English
+- The story is engaging and appropriate for a school setting
+- Character names are used throughout the story
+- The story has a clear beginning, middle, and end
+- If the story type is a Play or Dialogue, format it with speaker names and stage directions`;
+
+  const box = document.getElementById('promptBox');
+  if (box) {
+    box.textContent = generatedPrompt;
+    box.classList.remove('empty');
+  }
+  const copyBtn = document.getElementById('copyBtn');
+  if (copyBtn) copyBtn.disabled = false;
+}
+
+function copyPrompt() {
+  if (!generatedPrompt) return;
+  navigator.clipboard.writeText(generatedPrompt).then(() => {
+    const btn = document.getElementById('copyBtn');
+    if (btn) {
+      btn.textContent = 'Copied!';
+      setTimeout(() => {
+        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Prompt';
+      }, 2000);
+    }
+  });
+}
 
 function renderTabs() {
   const tabs = document.getElementById('levelTabs');
   if (!tabs) return;
-  tabs.innerHTML = LEVELS.map(l => `
-    <button class="level-tab ${currentLevel === l ? 'active' : ''}"
-            onclick="selectLevel('${l}')">${l}</button>
-  `).join('');
+  tabs.innerHTML = LEVELS.map(l => {
+    const isAI = l === '✨ AI Story Builder';
+    return `<button class="level-tab ${isAI ? 'ai-tab' : ''} ${currentLevel === l ? 'active' : ''}"
+            onclick="selectLevel('${l}')">${l}</button>`;
+  }).join('');
 }
 
 function selectLevel(level) {
@@ -676,8 +992,13 @@ function selectLevel(level) {
   currentStory = null;
   fieldValues = {};
   renderTabs();
-  renderPicker();
-  document.getElementById('formArea').innerHTML = '<div class="placeholder-msg"><span>📖</span>Choose a story above to get started!</div>';
+  if (level === '✨ AI Story Builder') {
+    document.getElementById('storyPicker').innerHTML = '';
+    renderAIBuilder();
+  } else {
+    renderPicker();
+    document.getElementById('formArea').innerHTML = '<div class="placeholder-msg"><span>📖</span>Choose a story above to get started!</div>';
+  }
 }
 
 function renderPicker() {
