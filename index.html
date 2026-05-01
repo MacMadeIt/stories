@@ -102,6 +102,46 @@
   .badge-b1  { background: #f3e8fd; color: #5a2d82; }
   .badge-b2  { background: #fde8f0; color: #8a1a40; }
 
+  /* Guided Writing tab */
+  .guided-tab { background: linear-gradient(135deg, #5a2d82, #2a5280) !important; color: white !important; border-color: transparent !important; }
+  .guided-tab:hover { opacity: 0.88; color: white !important; }
+
+  /* Guided Writing builder */
+  .guided-builder { background: white; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 1.75rem; margin-bottom: 1.5rem; }
+  .guided-builder h2 { font-family: "Crimson Pro", serif; font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .guided-builder .story-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.5rem; }
+
+  .progress-bar-wrap { background: var(--border); border-radius: 999px; height: 8px; margin: 1rem 0 0.4rem; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #5a2d82, #2a5280); transition: width 0.4s ease; }
+  .progress-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 1.25rem; }
+
+  .question-card { background: var(--cream); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+  .question-number { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #5a2d82; margin-bottom: 0.4rem; }
+  .question-text { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 0.3rem; line-height: 1.5; }
+  .question-tip { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; font-style: italic; }
+  .word-counter { font-size: 0.75rem; margin-top: 5px; }
+  .word-counter.ok { color: var(--green); font-weight: 700; }
+  .word-counter.short { color: var(--accent); }
+
+  .nav-btns { display: flex; gap: 10px; margin-top: 0.75rem; flex-wrap: wrap; }
+  .nav-btn { padding: 0.55rem 1.2rem; border-radius: 8px; border: 1.5px solid var(--border); background: white; font-family: "Nunito", sans-serif; font-size: 0.88rem; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn.primary { background: #5a2d82; border-color: #5a2d82; color: white; }
+  .nav-btn.primary:hover { background: #4a2270; }
+  .nav-btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+
+  .step-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1.25rem; }
+  .step-pill { padding: 4px 12px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; border: 1.5px solid var(--border); background: white; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .step-pill.done { background: var(--green-light); border-color: #c3dfc9; color: var(--green); }
+  .step-pill.active { background: #5a2d82; border-color: #5a2d82; color: white; }
+  .step-pill:hover { border-color: #5a2d82; color: #5a2d82; }
+
+  .preview-section { margin-bottom: 1.5rem; }
+  .preview-section h3 { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  .preview-text { font-size: 0.95rem; line-height: 1.9; color: var(--text); font-family: "Crimson Pro", serif; white-space: pre-wrap; }
+  .preview-chunk { display: inline; }
+  .preview-chunk.empty-chunk { color: #ccc; font-style: italic; }
+
   /* AI Story Builder tab */
   .ai-tab { background: linear-gradient(135deg, #2a5280, #3a6b45) !important; color: white !important; border-color: transparent !important; }
   .ai-tab:hover { opacity: 0.88; color: white !important; }
@@ -719,7 +759,7 @@ let currentLevel = 'All';
 // ─────────────────────────────────────────
 // RENDER STORY PICKER
 // ─────────────────────────────────────────
-const LEVELS = ['All', 'Pre-A1', 'A1', 'A2', 'B1', 'B2', '✨ AI Story Builder'];
+const LEVELS = ['All', 'Pre-A1', 'A1', 'A2', 'B1', 'B2', '📝 Guided Writing', '✨ AI Story Builder'];
 const BADGE_CLASS = { 'Pre-A1': 'badge-pre', 'A1': 'badge-a1', 'A2': 'badge-a2', 'B1': 'badge-b1', 'B2': 'badge-b2' };
 
 // ─────────────────────────────────────────
@@ -977,12 +1017,471 @@ function copyPrompt() {
   });
 }
 
+
+// ─────────────────────────────────────────
+// GUIDED WRITING STATE + DATA
+// ─────────────────────────────────────────
+
+const THEMES = {
+  adventure: {
+    name: 'Adventure', emoji: '🗺️',
+    desc: 'A brave journey into the unknown!',
+    questions: [
+      { id: 'setting',   label: 'Setting',          weight: 0.10, text: 'Where and when does your adventure take place?', tip: 'Describe the place and time. Is it a jungle? A mountain? The future? The past?' },
+      { id: 'hero',      label: 'Your Hero',        weight: 0.12, text: 'Who is the main character? Describe them.',       tip: 'Give them a name. What do they look like? What are they good at?' },
+      { id: 'goal',      label: 'The Goal',         weight: 0.12, text: 'What does your hero want to find or achieve?',   tip: 'A treasure? A missing person? A way home? Be specific!' },
+      { id: 'problem',   label: 'The Problem',      weight: 0.16, text: 'What big problem or danger do they face?',       tip: 'A storm? A villain? A trap? Describe what goes wrong.' },
+      { id: 'event1',    label: 'Event 1',          weight: 0.16, text: 'What is the first exciting thing that happens?', tip: 'Start the action! What do they discover or do first?' },
+      { id: 'event2',    label: 'Event 2',          weight: 0.16, text: 'What happens next? Things get harder!',          tip: 'Make it more difficult. The hero must try harder.' },
+      { id: 'ending',    label: 'The Ending',       weight: 0.18, text: 'How does the adventure end?',                   tip: 'Does the hero succeed? What do they learn?' },
+    ]
+  },
+  family: {
+    name: 'Family', emoji: '👨‍👩‍👧',
+    desc: 'A warm story about people who care for each other.',
+    questions: [
+      { id: 'setting',   label: 'Setting',          weight: 0.10, text: 'Where does this family story take place?',        tip: 'A home? A park? A holiday trip? Describe the place.' },
+      { id: 'chars',     label: 'The Family',       weight: 0.14, text: 'Who are the family members in this story?',      tip: 'Name them and describe how they are related.' },
+      { id: 'normal',    label: 'Normal Day',       weight: 0.12, text: 'What is normal life like for this family?',      tip: 'What do they do together? What makes them happy or different?' },
+      { id: 'problem',   label: 'The Problem',      weight: 0.16, text: 'What problem or disagreement happens?',          tip: 'An argument? A difficult change? Someone leaving? Describe it.' },
+      { id: 'event1',    label: 'Event 1',          weight: 0.16, text: 'How do the family members react to the problem?',tip: 'What do they say or do? Do they help each other?' },
+      { id: 'event2',    label: 'Event 2',          weight: 0.14, text: 'What happens that brings them closer together?', tip: 'A kind act? A conversation? A shared memory?' },
+      { id: 'ending',    label: 'The Ending',       weight: 0.18, text: 'How does the story end? What did they learn?',   tip: 'Is the problem solved? How does the family feel now?' },
+    ]
+  },
+  school: {
+    name: 'School Life', emoji: '🏫',
+    desc: 'A story set in the world of school and learning.',
+    questions: [
+      { id: 'setting',   label: 'Setting',          weight: 0.10, text: 'Describe your school setting.',                  tip: 'Is it a real school or imaginary? What grade or class?' },
+      { id: 'chars',     label: 'Characters',       weight: 0.12, text: 'Who are the main characters? Students? A teacher?', tip: 'Name them. Are they friends, rivals, or strangers?' },
+      { id: 'normal',    label: 'School Day',       weight: 0.12, text: 'What is a normal day like for your character?',  tip: 'What subjects do they like or hate? What is lunchtime like?' },
+      { id: 'problem',   label: 'The Problem',      weight: 0.16, text: 'What problem happens at school?',                tip: 'A test? A bully? Losing something? A big mistake?' },
+      { id: 'event1',    label: 'Event 1',          weight: 0.16, text: 'What do the characters do about the problem?',   tip: 'Who do they talk to? What do they try?' },
+      { id: 'event2',    label: 'Event 2',          weight: 0.16, text: 'Does it get better or worse? What happens next?',tip: 'A surprise? Help from someone unexpected?' },
+      { id: 'ending',    label: 'The Ending',       weight: 0.18, text: 'How does the school story end?',                 tip: 'Is the problem solved? What does the character learn?' },
+    ]
+  },
+  nature: {
+    name: 'Nature', emoji: '🌿',
+    desc: 'A story about the natural world and its wonders.',
+    questions: [
+      { id: 'setting',   label: 'Setting',          weight: 0.12, text: 'Describe the natural place in your story.',      tip: 'A forest? Ocean? Desert? Mountains? Paint a picture with words.' },
+      { id: 'chars',     label: 'Characters',       weight: 0.12, text: 'Who or what are the main characters?',           tip: 'Could be animals, a person, or even a plant! Describe them.' },
+      { id: 'normal',    label: 'Normal World',     weight: 0.12, text: 'What is life normally like in this natural place?', tip: 'What sounds, smells, and sights are there? What happens every day?' },
+      { id: 'problem',   label: 'The Problem',      weight: 0.16, text: 'What threatens or disturbs the natural world?',  tip: 'A storm? Pollution? A drought? An animal in danger?' },
+      { id: 'event1',    label: 'Event 1',          weight: 0.16, text: 'How do the characters react to the problem?',    tip: 'Do they fight back? Run away? Try to help?' },
+      { id: 'event2',    label: 'Event 2',          weight: 0.14, text: 'What is the turning point in the story?',        tip: 'Something changes. What happens that makes a difference?' },
+      { id: 'ending',    label: 'The Ending',       weight: 0.18, text: 'How does the story in nature end?',              tip: 'Is nature saved? What lesson does the story share?' },
+    ]
+  },
+  mystery: {
+    name: 'Mystery', emoji: '🔍',
+    desc: 'Something strange has happened. Can anyone solve it?',
+    questions: [
+      { id: 'setting',   label: 'Setting',          weight: 0.10, text: 'Where does the mystery take place?',             tip: 'A school? An old house? A small town? Set the scene!' },
+      { id: 'chars',     label: 'Characters',       weight: 0.12, text: 'Who is trying to solve the mystery?',            tip: 'A detective? A curious kid? A group of friends? Name them.' },
+      { id: 'mystery',   label: 'The Mystery',      weight: 0.16, text: 'What strange or unexplained thing happened?',    tip: 'Something missing? A strange noise? An impossible event?' },
+      { id: 'clue1',     label: 'First Clue',       weight: 0.14, text: 'What is the first clue the character finds?',    tip: 'Something they see, hear, or discover. Where does it lead?' },
+      { id: 'clue2',     label: 'Second Clue',      weight: 0.14, text: 'What is the second clue? Does it surprise them?',tip: 'It should change what they thought was true!' },
+      { id: 'twist',     label: 'The Twist',        weight: 0.16, text: 'Is there a surprise or unexpected turn?',        tip: 'A person is not who they seem? The answer is closer than expected?' },
+      { id: 'ending',    label: 'The Solution',     weight: 0.18, text: 'How is the mystery finally solved?',             tip: 'Who or what was behind it all? How do the characters feel?' },
+    ]
+  },
+  friendship: {
+    name: 'Friendship', emoji: '🤝',
+    desc: 'A story about meeting, connecting, and growing together.',
+    questions: [
+      { id: 'setting',   label: 'Setting',          weight: 0.10, text: 'Where do the friends meet or spend time?',       tip: 'A park? A classroom? Online? A neighbourhood?' },
+      { id: 'chars',     label: 'The Friends',      weight: 0.14, text: 'Describe the main characters.',                  tip: 'Name them. How are they similar? How are they different?' },
+      { id: 'meeting',   label: 'How They Meet',    weight: 0.14, text: 'How do the characters first meet or connect?',   tip: 'An accident? A shared interest? Someone in need of help?' },
+      { id: 'problem',   label: 'The Problem',      weight: 0.16, text: 'What challenges their friendship?',              tip: 'A disagreement? A misunderstanding? Someone trying to break them apart?' },
+      { id: 'event1',    label: 'Event 1',          weight: 0.14, text: 'What do they do that tests or strengthens the friendship?', tip: 'A hard choice? Sticking up for each other?' },
+      { id: 'event2',    label: 'Event 2',          weight: 0.14, text: 'How do they work through the problem together?', tip: 'A conversation? An act of kindness? An apology?' },
+      { id: 'ending',    label: 'The Ending',       weight: 0.18, text: 'How does the friendship story end?',             tip: 'Are they closer now? What did they learn about each other?' },
+    ]
+  }
+};
+
+const WORD_RANGES = {
+  '50–100 words':   { min: 50,  max: 100  },
+  '100–150 words':  { min: 100, max: 150  },
+  '150–200 words':  { min: 150, max: 200  },
+  '200–300 words':  { min: 200, max: 300  },
+  '300–400 words':  { min: 300, max: 400  },
+};
+
+let gwState = {
+  step: 'setup',         // 'setup' | 'writing' | 'done'
+  theme: null,
+  wordRange: '',
+  studentName: '',
+  studentClass: '',
+  currentQ: 0,
+  answers: {},           // { questionId: text }
+};
+
+function countWords(str) {
+  return str.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function getMinWords(question, theme, wordRange) {
+  const range = WORD_RANGES[wordRange];
+  if (!range) return 10;
+  const target = Math.round((range.min + range.max) / 2);
+  const qs = THEMES[theme].questions;
+  const totalWeight = qs.reduce((a, q) => a + q.weight, 0);
+  return Math.max(5, Math.round((question.weight / totalWeight) * target));
+}
+
+// ─── SETUP SCREEN ───
+function renderGuidedSetup() {
+  const area = document.getElementById('formArea');
+  const classOpts = ['IO1','IO2','IO3','IO4','IO5','IO6','OD2','OD3','OD4','OD5','OD6','Other']
+    .map(c => `<option value="${c}" ${gwState.studentClass === c ? 'selected':''}>${c}</option>`).join('');
+
+  const themeCards = Object.entries(THEMES).map(([key, t]) => `
+    <button class="story-btn ${gwState.theme === key ? 'active':''}"
+            onclick="gwState.theme='${key}'; renderGuidedSetup()">
+      <span>${t.emoji}</span>${t.name}
+      <div style="font-size:0.72rem;font-weight:400;color:inherit;margin-top:3px;opacity:0.8">${t.desc}</div>
+    </button>`).join('');
+
+  area.innerHTML = `
+    <div class="guided-builder">
+      <h2>📝 Guided Writing</h2>
+      <p class="story-desc">Answer questions one at a time and build your own story from start to finish!</p>
+
+      <div class="ai-section-title">About you</div>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Your name(s) <span class="required-star">*</span></label>
+          <input type="text" maxlength="60" placeholder="e.g. Amy, Tom"
+                 value="${gwState.studentName}"
+                 oninput="gwState.studentName = this.value" />
+        </div>
+        <div class="field">
+          <label>Class <span class="required-star">*</span></label>
+          <select onchange="gwState.studentClass = this.value">
+            <option value="">Select class...</option>
+            ${classOpts}
+          </select>
+        </div>
+      </div>
+
+      <div class="ai-section-title">How long is your story?</div>
+      <div class="fields-grid">
+        <div class="field">
+          <label>Target word count <span class="required-star">*</span></label>
+          <select onchange="gwState.wordRange = this.value">
+            <option value="">Choose length...</option>
+            ${Object.keys(WORD_RANGES).map(w =>
+              `<option value="${w}" ${gwState.wordRange===w?'selected':''}>${w}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="ai-section-title">Choose your theme <span class="required-star">*</span></div>
+      <div class="story-grid">${themeCards}</div>
+
+      <button class="generate-btn" onclick="startGuidedWriting()" style="margin-top:0.5rem">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        Start Writing
+      </button>
+    </div>
+  `;
+}
+
+function startGuidedWriting() {
+  const missing = [];
+  if (!gwState.studentName.trim()) missing.push('Your name');
+  if (!gwState.studentClass) missing.push('Class');
+  if (!gwState.wordRange) missing.push('Word count');
+  if (!gwState.theme) missing.push('A theme');
+  if (missing.length) {
+    alert('Please fill in:\n\n' + missing.map(m => '• ' + m).join('\n'));
+    return;
+  }
+  gwState.step = 'writing';
+  gwState.currentQ = 0;
+  gwState.answers = {};
+  renderGuidedWriting();
+}
+
+// ─── WRITING SCREEN ───
+function renderGuidedWriting() {
+  const area = document.getElementById('formArea');
+  const theme = THEMES[gwState.theme];
+  const questions = theme.questions;
+  const qIdx = gwState.currentQ;
+  const q = questions[qIdx];
+  const minWords = getMinWords(q, gwState.theme, gwState.wordRange);
+  const currentAnswer = gwState.answers[q.id] || '';
+  const wc = countWords(currentAnswer);
+  const wordOk = wc >= minWords;
+  const isLast = qIdx === questions.length - 1;
+  const allAnswered = questions.every(q2 => (gwState.answers[q2.id] || '').trim().length > 0);
+
+  // Step pills
+  const pills = questions.map((q2, i) => {
+    const answered = gwState.answers[q2.id] && gwState.answers[q2.id].trim();
+    const active = i === qIdx;
+    return `<button class="step-pill ${active ? 'active' : answered ? 'done' : ''}"
+      onclick="gwState.currentQ=${i}; renderGuidedWriting()">${q2.label}</button>`;
+  }).join('');
+
+  // Progress
+  const done = questions.filter(q2 => gwState.answers[q2.id] && gwState.answers[q2.id].trim()).length;
+  const pct = Math.round((done / questions.length) * 100);
+
+  // Live preview
+  const range = WORD_RANGES[gwState.wordRange];
+  const useParagraphs = range && range.min >= 150;
+  const previewParts = questions.map(q2 => {
+    const ans = gwState.answers[q2.id] || '';
+    if (!ans.trim()) return `<span class="preview-chunk empty-chunk">[${q2.label}...]</span>`;
+    return `<span class="preview-chunk">${ans.trim()}</span>`;
+  });
+  const previewText = useParagraphs
+    ? previewParts.join(' <br><br> ')
+    : previewParts.join(' ');
+
+  // Total word count of all answers
+  const totalWc = Object.values(gwState.answers).reduce((a, v) => a + countWords(v), 0);
+  const targetMid = range ? Math.round((range.min + range.max) / 2) : 0;
+
+  area.innerHTML = `
+    <div class="guided-builder">
+      <h2>${theme.emoji} ${theme.name} Story</h2>
+      <p class="story-desc">${gwState.studentName} · ${gwState.studentClass} · ${gwState.wordRange}</p>
+
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="progress-label">${done} of ${questions.length} sections done · ${totalWc} words written</div>
+
+      <div class="step-pills">${pills}</div>
+
+      <div class="question-card">
+        <div class="question-number">Question ${qIdx + 1} of ${questions.length} — ${q.label}</div>
+        <div class="question-text">${q.text}</div>
+        <div class="question-tip">💡 ${q.tip}</div>
+        <textarea class="ai-textarea" id="gwTextarea"
+                  placeholder="Write at least ${minWords} words here..."
+                  oninput="gwHandleInput(this.value)"
+                  style="min-height:100px">${currentAnswer}</textarea>
+        <div class="word-counter ${wordOk ? 'ok' : 'short'}" id="gwWordCount">
+          ${wordOk ? '✓' : '✗'} ${wc} / ${minWords} words minimum
+        </div>
+        <div class="nav-btns">
+          <button class="nav-btn" onclick="gwState.currentQ=Math.max(0,gwState.currentQ-1);renderGuidedWriting()"
+                  ${qIdx === 0 ? 'disabled' : ''}>← Back</button>
+          ${!isLast
+            ? `<button class="nav-btn primary" id="gwNextBtn" onclick="gwNext()" ${wordOk ? '' : 'disabled'}>
+                Next →</button>`
+            : `<button class="nav-btn primary" id="gwNextBtn" onclick="gwFinish()" ${wordOk ? '' : 'disabled'}>
+                Finish ✓</button>`}
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <h3>Your story so far · ${totalWc} words</h3>
+        <div class="preview-text">${previewText}</div>
+      </div>
+    </div>
+  `;
+}
+
+function gwHandleInput(val) {
+  const theme = THEMES[gwState.theme];
+  const q = theme.questions[gwState.currentQ];
+  gwState.answers[q.id] = val;
+  const minWords = getMinWords(q, gwState.theme, gwState.wordRange);
+  const wc = countWords(val);
+  const wordOk = wc >= minWords;
+
+  const counter = document.getElementById('gwWordCount');
+  if (counter) {
+    counter.textContent = (wordOk ? '✓ ' : '✗ ') + wc + ' / ' + minWords + ' words minimum';
+    counter.className = 'word-counter ' + (wordOk ? 'ok' : 'short');
+  }
+  const nextBtn = document.getElementById('gwNextBtn');
+  if (nextBtn) nextBtn.disabled = !wordOk;
+
+  // Update preview live
+  const range = WORD_RANGES[gwState.wordRange];
+  const useParagraphs = range && range.min >= 150;
+  const questions = theme.questions;
+  const previewParts = questions.map(q2 => {
+    const ans = gwState.answers[q2.id] || '';
+    if (!ans.trim()) return '<span class="preview-chunk empty-chunk">[' + q2.label + '...]</span>';
+    return '<span class="preview-chunk">' + ans.trim() + '</span>';
+  });
+  const previewText = useParagraphs ? previewParts.join(' <br><br> ') : previewParts.join(' ');
+  const totalWc = Object.values(gwState.answers).reduce((a, v) => a + countWords(v), 0);
+  const previewEl = document.querySelector('.preview-text');
+  if (previewEl) previewEl.innerHTML = previewText;
+  const previewLabel = document.querySelector('.preview-section h3');
+  if (previewLabel) previewLabel.textContent = 'Your story so far · ' + totalWc + ' words';
+  const progressLabel = document.querySelector('.progress-label');
+  const done = questions.filter(q2 => (gwState.answers[q2.id] || '').trim().length > 0).length;
+  const pct = Math.round((done / questions.length) * 100);
+  const bar = document.querySelector('.progress-bar-fill');
+  if (bar) bar.style.width = pct + '%';
+  if (progressLabel) progressLabel.textContent = done + ' of ' + questions.length + ' sections done · ' + totalWc + ' words written';
+}
+
+function gwNext() {
+  const theme = THEMES[gwState.theme];
+  if (gwState.currentQ < theme.questions.length - 1) {
+    gwState.currentQ++;
+    renderGuidedWriting();
+    document.getElementById('formArea').scrollTop = 0;
+  }
+}
+
+function gwFinish() {
+  gwState.step = 'done';
+  renderGuidedDone();
+}
+
+// ─── DONE SCREEN ───
+function renderGuidedDone() {
+  const area = document.getElementById('formArea');
+  const theme = THEMES[gwState.theme];
+  const range = WORD_RANGES[gwState.wordRange];
+  const useParagraphs = range && range.min >= 150;
+
+  const storyParts = theme.questions.map(q => (gwState.answers[q.id] || '').trim()).filter(Boolean);
+  const storyText = useParagraphs ? storyParts.join('\n\n') : storyParts.join(' ');
+  const totalWc = Object.values(gwState.answers).reduce((a, v) => a + countWords(v), 0);
+
+  area.innerHTML = `
+    <div class="guided-builder">
+      <h2>${theme.emoji} Your Story is Done!</h2>
+      <p class="story-desc">${gwState.studentName} · ${gwState.studentClass} · ${totalWc} words</p>
+
+      <div class="step-pills">
+        ${theme.questions.map((q2, i) =>
+          `<button class="step-pill done" onclick="gwState.currentQ=${i}; gwState.step='writing'; renderGuidedWriting()">${q2.label}</button>`
+        ).join('')}
+      </div>
+
+      <div class="preview-section">
+        <h3>${theme.name} Story · ${totalWc} words</h3>
+        <div class="preview-text" style="background:var(--cream);padding:1.25rem;border-radius:var(--radius);border:1.5px solid var(--border)">${
+          useParagraphs
+            ? storyParts.map(p => `<p style="margin:0 0 1em">${p}</p>`).join('')
+            : storyParts.join(' ')
+        }</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="generate-btn" onclick="sendGuidedToDrive()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+          Send to Teacher
+        </button>
+        <button class="nav-btn" onclick="gwState.step='writing'; gwState.currentQ=0; renderGuidedWriting()">
+          ← Edit Story
+        </button>
+        <button class="nav-btn" onclick="gwState={step:'setup',theme:null,wordRange:'',studentName:'',studentClass:'',currentQ:0,answers:{}}; renderGuidedSetup()">
+          Start Over
+        </button>
+      </div>
+      <div id="gwStatus" style="margin-top:12px;text-align:center;font-size:0.85rem;min-height:1.4em;"></div>
+    </div>
+  `;
+}
+
+async function sendGuidedToDrive() {
+  const theme = THEMES[gwState.theme];
+  const range = WORD_RANGES[gwState.wordRange];
+  const useParagraphs = range && range.min >= 150;
+  const storyParts = theme.questions.map(q => (gwState.answers[q.id] || '').trim()).filter(Boolean);
+  const storyText = useParagraphs ? storyParts.join('\n\n') : storyParts.join(' ');
+  const totalWc = Object.values(gwState.answers).reduce((a, v) => a + countWords(v), 0);
+
+  const statusEl = document.getElementById('gwStatus');
+  if (statusEl) { statusEl.textContent = 'Building document...'; statusEl.style.color = 'var(--muted)'; }
+
+  // Build a simple docx-compatible XML
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function xmlRun(t, opts={}) {
+    const rpr = [(opts.bold?'<w:b/>':''),(opts.italic?'<w:i/>':''),(opts.size?'<w:sz w:val="'+opts.size+'"/><w:szCs w:val="'+opts.size+'"/>':''),(opts.color?'<w:color w:val="'+opts.color+'"/>':''),(opts.font?'<w:rFonts w:ascii="'+opts.font+'" w:hAnsi="'+opts.font+'"/>':'')].join('');
+    return '<w:r>'+(rpr?'<w:rPr>'+rpr+'</w:rPr>':'')+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>';
+  }
+  function xmlPara(runs, opts={}) {
+    const ppr = [(opts.align?'<w:jc w:val="'+opts.align+'"/>':''),(opts.before||opts.after?'<w:spacing w:before="'+(opts.before||0)+'" w:after="'+(opts.after||0)+'"/>':'')].join('');
+    return '<w:p>'+(ppr?'<w:pPr>'+ppr+'</w:pPr>':'')+runs+'</w:p>';
+  }
+
+  const F = 'Arial';
+  let body = '';
+  body += xmlPara(xmlRun(theme.name + ' Story', {font:F, size:36, bold:true}), {align:'center', before:0, after:80});
+  body += xmlPara(xmlRun(gwState.studentClass + '  ·  ' + gwState.studentName.trim() + '  ·  ' + totalWc + ' words', {font:F, size:18, color:'888888'}), {align:'center', before:0, after:200});
+
+  if (useParagraphs) {
+    theme.questions.forEach(q => {
+      const ans = (gwState.answers[q.id] || '').trim();
+      if (!ans) return;
+      body += xmlPara(xmlRun(q.label, {font:F, size:20, bold:true, color:'444444'}), {before:180, after:60});
+      body += xmlPara(xmlRun(ans, {font:F, size:22}), {before:0, after:120});
+    });
+  } else {
+    body += xmlPara(xmlRun(storyText, {font:F, size:22}), {before:0, after:0});
+  }
+
+  const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' + body + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900"/></w:sectPr></w:body></w:document>';
+  const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  const wordRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+  const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+
+  function crc32(data) {
+    const table = crc32.t || (crc32.t=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[i]=c;}return t;})());
+    let c=0xFFFFFFFF;for(let i=0;i<data.length;i++)c=table[(c^data[i])&0xFF]^(c>>>8);return(c^0xFFFFFFFF)>>>0;
+  }
+  function makeZip(files) {
+    const enc=new TextEncoder();const localHeaders=[];const centralDirs=[];let offset=0;
+    for(const[name,content2]of files){
+      const nameBytes=enc.encode(name);const dataBytes=typeof content2==='string'?enc.encode(content2):content2;
+      const crc=crc32(dataBytes);const size=dataBytes.length;
+      const local=new Uint8Array(30+nameBytes.length+size);const dv=new DataView(local.buffer);
+      dv.setUint32(0,0x04034b50,true);dv.setUint16(4,20,true);dv.setUint16(6,0,true);dv.setUint16(8,0,true);dv.setUint16(10,0,true);dv.setUint16(12,0,true);
+      dv.setUint32(14,crc,true);dv.setUint32(18,size,true);dv.setUint32(22,size,true);dv.setUint16(26,nameBytes.length,true);dv.setUint16(28,0,true);
+      local.set(nameBytes,30);local.set(dataBytes,30+nameBytes.length);localHeaders.push(local);
+      const cd=new Uint8Array(46+nameBytes.length);const cdv=new DataView(cd.buffer);
+      cdv.setUint32(0,0x02014b50,true);cdv.setUint16(4,20,true);cdv.setUint16(6,20,true);cdv.setUint16(8,0,true);cdv.setUint16(10,0,true);cdv.setUint16(12,0,true);cdv.setUint16(14,0,true);
+      cdv.setUint32(16,crc,true);cdv.setUint32(20,size,true);cdv.setUint32(24,size,true);cdv.setUint16(28,nameBytes.length,true);cdv.setUint16(30,0,true);cdv.setUint16(32,0,true);cdv.setUint16(34,0,true);cdv.setUint16(36,0,true);
+      cdv.setUint32(38,0,true);cdv.setUint32(42,offset,true);cd.set(nameBytes,46);centralDirs.push(cd);offset+=local.length;
+    }
+    const cdOffset=offset;const cdSize=centralDirs.reduce((a,b)=>a+b.length,0);
+    const eocd=new Uint8Array(22);const ev=new DataView(eocd.buffer);
+    ev.setUint32(0,0x06054b50,true);ev.setUint16(4,0,true);ev.setUint16(6,0,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,cdSize,true);ev.setUint32(16,cdOffset,true);ev.setUint16(20,0,true);
+    const all=[...localHeaders,...centralDirs,eocd];const total=all.reduce((a,b)=>a+b.length,0);const out=new Uint8Array(total);let pos=0;for(const a of all){out.set(a,pos);pos+=a.length;}return out;
+  }
+
+  const zipBytes = makeZip([['[Content_Types].xml',contentTypesXml],['_rels/.rels',relsXml],['word/document.xml',docXml],['word/_rels/document.xml.rels',wordRelsXml]]);
+  const blob = new Blob([zipBytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+
+  const safeName = gwState.studentName.trim().replace(/[^a-zA-Z0-9_ -]/g,'').replace(/\s+/g,'_');
+  const filename = gwState.studentClass + '_' + safeName + '_' + theme.name + '_Story.docx';
+
+  if (statusEl) { statusEl.textContent = "Uploading to teacher's folder..."; }
+  try {
+    await uploadToDrive(blob, filename);
+    if (statusEl) { statusEl.textContent = "Sent! Your teacher will read it soon."; statusEl.style.color = 'var(--green)'; }
+  } catch(err) {
+    if (statusEl) { statusEl.textContent = "Something went wrong: " + err.message; statusEl.style.color = '#c0622a'; }
+  }
+}
+
 function renderTabs() {
   const tabs = document.getElementById('levelTabs');
   if (!tabs) return;
   tabs.innerHTML = LEVELS.map(l => {
     const isAI = l === '✨ AI Story Builder';
-    return `<button class="level-tab ${isAI ? 'ai-tab' : ''} ${currentLevel === l ? 'active' : ''}"
+    const isGuided = l === '📝 Guided Writing';
+    return `<button class="level-tab ${isAI ? 'ai-tab' : ''} ${isGuided ? 'guided-tab' : ''} ${currentLevel === l ? 'active' : ''}"
             onclick="selectLevel('${l}')">${l}</button>`;
   }).join('');
 }
@@ -995,6 +1494,9 @@ function selectLevel(level) {
   if (level === '✨ AI Story Builder') {
     document.getElementById('storyPicker').innerHTML = '';
     renderAIBuilder();
+  } else if (level === '📝 Guided Writing') {
+    document.getElementById('storyPicker').innerHTML = '';
+    renderGuidedSetup();
   } else {
     renderPicker();
     document.getElementById('formArea').innerHTML = '<div class="placeholder-msg"><span>📖</span>Choose a story above to get started!</div>';
