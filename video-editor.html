@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Video Editor — Shorts Maker</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<style>
+:root {
+  --cream: #fdf8f0;
+  --warm: #f5ede0;
+  --border: #e2d5c3;
+  --text: #2c1f0e;
+  --muted: #8c7560;
+  --accent: #c0622a;
+  --accent-light: #f7ece3;
+  --green: #3a6b45;
+  --green-light: #eaf3ec;
+  --blue: #2a5280;
+  --blue-light: #e8f0f8;
+  --red: #b83232;
+  --red-light: #fdecea;
+  --yellow: #b87c00;
+  --yellow-light: #fef9e7;
+  --radius: 10px;
+  --side: 310px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--cream);
+  color: var(--text);
+  font-family: 'Nunito', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  background: var(--text);
+  color: var(--cream);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+header h1 {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+header p { font-size: 0.78rem; opacity: 0.55; }
+.app {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Main left panel ── */
+.main-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+
+/* Upload zone */
+.upload-zone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem;
+  border: 2.5px dashed var(--border);
+  margin: 1.5rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.upload-icon { font-size: 3rem; line-height: 1; }
+.upload-title { font-size: 1.1rem; font-weight: 700; }
+.upload-sub { font-size: 0.8rem; color: var(--muted); }
+
+/* Preview area */
+.preview-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.video-wrapper {
+  position: relative;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  max-height: 50vh;
+}
+.video-wrapper video {
+  max-width: 100%;
+  max-height: 50vh;
+  display: block;
+}
+#overlay-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+.video-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--warm);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ctrl-btn {
+  background: var(--text);
+  color: var(--cream);
+  border: none;
+  border-radius: 6px;
+  width: 34px; height: 34px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ctrl-btn:hover { background: var(--accent); }
+.time-display { font-size: 0.78rem; color: var(--muted); font-weight: 600; min-width: 90px; }
+.vol-wrap { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; font-size: 0.85rem; }
+.vol-wrap input[type=range] { width: 70px; accent-color: var(--accent); }
+.speed-select { font-size: 0.75rem; border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px; background: white; }
+
+/* Timeline */
+.timeline-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0.75rem;
+  gap: 0.4rem;
+  min-height: 0;
+}
+.timeline-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.timeline-body {
+  position: relative;
+  height: 72px;
+  background: var(--warm);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: crosshair;
+  flex-shrink: 0;
+}
+#waveform-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+#cut-layer {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+#playhead {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 10;
+}
+.timeline-ruler {
+  position: relative;
+  height: 18px;
+  flex-shrink: 0;
+}
+#ruler-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+.timeline-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.dot.red { background: rgba(184,50,50,0.6); }
+.dot.blue { background: rgba(42,82,128,0.6); }
+.dot.green { background: rgba(58,107,69,0.5); }
+
+/* ── Side panel ── */
+.side-panel {
+  width: var(--side);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: white;
+}
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab {
+  flex: 1;
+  padding: 0.65rem 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.tab:hover { color: var(--accent); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-light); }
+.tab-content { display: none; flex: 1; overflow-y: auto; padding: 0.9rem; flex-direction: column; gap: 1rem; }
+.tab-content.active { display: flex; }
+
+/* Sections in side panel */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.section h3 { font-size: 0.82rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); }
+.section h4 { font-size: 0.9rem; font-weight: 700; }
+.row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Form elements */
+label { display: flex; flex-direction: column; gap: 3px; font-size: 0.78rem; font-weight: 700; color: var(--text); }
+input[type=text], input[type=password], input[type=number], select, textarea {
+  padding: 0.45rem 0.6rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  background: var(--cream);
+  color: var(--text);
+  transition: border-color 0.15s;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+input[type=range] { padding: 0; accent-color: var(--accent); cursor: pointer; }
+.range-row { display: flex; align-items: center; gap: 0.5rem; }
+.range-row input[type=range] { flex: 1; }
+.range-val { font-size: 0.75rem; color: var(--muted); min-width: 32px; text-align: right; font-weight: 600; }
+input[type=color] { padding: 2px; height: 34px; cursor: pointer; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.hint { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 7px;
+  border: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover:not(:disabled) { background: #a0521f; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost { background: var(--warm); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--border); }
+.btn-danger { background: var(--red-light); color: var(--red); border: 1px solid #f5b8b8; }
+.btn-danger:hover { background: #f5b8b8; }
+.btn-small { padding: 0.3rem 0.6rem; font-size: 0.72rem; }
+.btn-full { width: 100%; }
+.btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* Cut / Overlay list items */
+.cut-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.76rem;
+  background: var(--cream);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.cut-item:hover { border-color: var(--accent); }
+.cut-item.disabled { opacity: 0.45; }
+.cut-item.selected { border-color: var(--accent); background: var(--accent-light); }
+.cut-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.badge-silence { background: var(--red-light); color: var(--red); }
+.badge-stutter { background: var(--blue-light); color: var(--blue); }
+.badge-bad-take { background: var(--yellow-light); color: var(--yellow); }
+.badge-manual { background: var(--green-light); color: var(--green); }
+.badge-overlay { background: var(--green-light); color: var(--green); }
+.cut-time { font-weight: 600; color: var(--text); flex: 1; }
+.cut-reason { color: var(--muted); font-size: 0.7rem; flex: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cut-toggle { margin-left: auto; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: var(--accent); }
+.cut-del { margin-left: 2px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0 2px; flex-shrink: 0; }
+.cut-del:hover { color: var(--red); }
+
+/* Transcript */
+.transcript-panel {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  background: var(--cream);
+}
+.transcript-word { cursor: pointer; padding: 1px 2px; border-radius: 3px; }
+.transcript-word:hover { background: var(--warm); }
+.transcript-word.flagged { background: var(--red-light); color: var(--red); text-decoration: line-through; }
+.transcript-word.stutter { background: var(--blue-light); color: var(--blue); }
+
+/* Overlay editor */
+.overlay-editor {
+  padding: 0.75rem;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-light);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* Format picker */
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.format-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 0.5rem 0.25rem;
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  transition: all 0.15s;
+}
+.format-card input { display: none; }
+.format-card:has(input:checked) { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.format-preview {
+  background: var(--warm);
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--muted);
+  border-radius: 4px;
+}
+.format-preview.reel   { width: 24px; height: 42px; }
+.format-preview.square { width: 34px; height: 34px; }
+.format-preview.landscape { width: 48px; height: 27px; }
+
+/* Export progress */
+.export-progress { display: flex; flex-direction: column; gap: 0.4rem; }
+.progress-bar { height: 8px; background: var(--warm); border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.3s; width: 0%; }
+.progress-text { font-size: 0.74rem; color: var(--muted); }
+.export-result {
+  padding: 0.75rem;
+  background: var(--green-light);
+  border: 1.5px solid #b2d4ba;
+  border-radius: 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+}
+.export-summary {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 0.5rem 0.6rem;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.export-summary b { color: var(--text); }
+
+/* Status toast */
+#toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--text);
+  color: var(--cream);
+  padding: 0.6rem 1.2rem;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: all 0.25s;
+  z-index: 100;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.error { background: var(--red); }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+/* Hidden utility */
+.hidden { display: none !important; }
+
+/* Separator */
+hr { border: none; border-top: 1px solid var(--border); }
+
+/* Loading spinner */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Mobile */
+@media (max-width: 700px) {
+  .app { flex-direction: column; overflow: auto; }
+  .side-panel { width: 100%; border-right: none; border-top: 1px solid var(--border); }
+  .main-panel { border-right: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI Video Editor</h1>
+  <p>Cut pauses · Remove stutters · Add overlays · Export Shorts</p>
+</header>
+
+<div class="app">
+
+  <!-- ── Left: video + timeline ── -->
+  <div class="main-panel">
+
+    <!-- Upload zone -->
+    <div id="upload-zone" class="upload-zone" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div class="upload-icon">🎬</div>
+      <p class="upload-title">Drop your video clip here</p>
+      <p class="upload-sub">MP4, MOV, WebM — up to 2 GB</p>
+      <label class="btn btn-primary" style="margin-top:0.5rem">
+        Choose File
+        <input type="file" id="file-input" accept="video/*" style="display:none" onchange="loadVideo(this.files[0])">
+      </label>
+    </div>
+
+    <!-- Video preview (hidden until loaded) -->
+    <div id="preview-panel" class="preview-panel hidden">
+
+      <div class="video-wrapper" id="video-wrapper">
+        <video id="video" playsinline></video>
+        <canvas id="overlay-canvas"></canvas>
+      </div>
+
+      <div class="video-controls">
+        <button class="ctrl-btn" id="btn-play" onclick="togglePlay()">▶</button>
+        <button class="ctrl-btn" id="btn-mute" onclick="toggleMute()" title="Mute">🔊</button>
+        <span class="time-display" id="time-display">0:00 / 0:00</span>
+        <label class="vol-wrap" style="font-size:0.72rem;font-weight:600;color:var(--muted)">
+          Vol
+          <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1" oninput="setVolume(this.value)">
+        </label>
+        <select class="speed-select" id="speed-select" onchange="setSpeed(this.value)">
+          <option value="0.5">0.5×</option>
+          <option value="0.75">0.75×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option>
+        </select>
+        <button class="btn btn-ghost btn-small" onclick="replaceVideo()" style="margin-left:auto">Replace ↩</button>
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline-wrap">
+        <div class="timeline-label">
+          <span>Timeline</span>
+          <span id="timeline-stats" style="font-weight:400"></span>
+        </div>
+        <div class="timeline-body" id="timeline-body"
+             onmousedown="timelineMouseDown(event)"
+             onmousemove="timelineMouseMove(event)"
+             onmouseup="timelineMouseUp(event)"
+             onmouseleave="timelineMouseLeave(event)"
+             onclick="timelineClick(event)">
+          <canvas id="waveform-canvas"></canvas>
+          <canvas id="cut-layer"></canvas>
+          <div id="playhead"></div>
+        </div>
+        <div class="timeline-ruler">
+          <canvas id="ruler-canvas"></canvas>
+        </div>
+        <div class="timeline-legend">
+          <span class="legend-item"><span class="dot red"></span>Silence/pause</span>
+          <span class="legend-item"><span class="dot blue"></span>Stutter/bad take</span>
+          <span class="legend-item"><span class="dot green"></span>Text overlay</span>
+          <span class="legend-item" style="color:var(--muted);font-size:0.7rem">Drag on timeline to add manual cut</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Right: side panel ── -->
+  <div class="side-panel">
+    <div class="tab-bar">
+      <button class="tab active" onclick="switchTab('analyze')">Analyze</button>
+      <button class="tab" onclick="switchTab('cuts')">Cuts</button>
+      <button class="tab" onclick="switchTab('overlays')">Overlays</button>
+      <button class="tab" onclick="switchTab('export')">Export</button>
+    </div>
+
+    <!-- ANALYZE TAB -->
+    <div id="tab-analyze" class="tab-content active">
+
+      <div class="section">
+        <h3>Silence Detection</h3>
+        <p class="hint">Detects pauses in speech. No API key needed.</p>
+        <label>Silence threshold
+          <div class="range-row">
+            <input type="range" id="silence-threshold" min="0.005" max="0.08" step="0.005" value="0.025" oninput="document.getElementById('threshold-val').textContent=parseFloat(this.value).toFixed(3)">
+            <span class="range-val" id="threshold-val">0.025</span>
+          </div>
+        </label>
+        <label>Min pause to cut (seconds)
+          <div class="range-row">
+            <input type="range" id="min-pause" min="0.2" max="3" step="0.1" value="0.5" oninput="document.getElementById('min-pause-val').textContent=parseFloat(this.value).toFixed(1)+'s'">
+            <span class="range-val" id="min-pause-val">0.5s</span>
+          </div>
+        </label>
+        <label>Keep gap at ends (ms)
+          <div class="range-row">
+            <input type="range" id="end-gap" min="0" max="500" step="25" value="100" oninput="document.getElementById('end-gap-val').textContent=this.value+'ms'">
+            <span class="range-val" id="end-gap-val">100ms</span>
+          </div>
+        </label>
+        <button id="btn-detect" class="btn btn-primary" disabled onclick="runSilenceDetection()">
+          Detect Pauses
+        </button>
+      </div>
+
+      <hr>
+
+      <div class="section">
+        <h3>AI Transcript Analysis</h3>
+        <p class="hint">Transcribes audio with Whisper then uses Claude to flag stutters, repeated phrases, filler words, and messed-up lines.</p>
+        <label>OpenAI API Key (Whisper transcription)
+          <input type="password" id="openai-key" placeholder="sk-…" autocomplete="off">
+        </label>
+        <label>Anthropic API Key (Claude analysis)
+          <input type="password" id="anthropic-key" placeholder="sk-ant-…" autocomplete="off">
+        </label>
+        <button id="btn-transcribe" class="btn btn-primary" disabled onclick="runAIAnalysis()">
+          Transcribe &amp; Analyze
+        </button>
+      </div>
+
+    </div>
+
+    <!-- CUTS TAB -->
+    <div id="tab-cuts" class="tab-content">
+
+      <div class="section">
+        <div class="row-header">
+          <h3>Cut Regions</h3>
+          <button class="btn btn-ghost btn-small" onclick="addManualCut()">+ Manual Cut</button>
+        </div>
+        <p class="hint" id="cuts-hint">No cuts yet. Run Silence Detection or drag on the timeline.</p>
+        <div id="cuts-list" class="section" style="gap:0.35rem"></div>
+      </div>
+
+      <hr>
+
+      <div class="section">
+        <div class="row-header">
+          <h3>Transcript</h3>
+          <span id="transcript-status" class="hint"></span>
+        </div>
+        <div id="transcript-panel" class="transcript-panel">
+          <span class="hint">Transcript appears here after AI analysis.</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- OVERLAYS TAB -->
+    <div id="tab-overlays" class="tab-content">
+
+      <div class="section">
+        <div class="row-header">
+          <h3>Text Overlays</h3>
+          <button class="btn btn-ghost btn-small" onclick="addOverlay()">+ Add Text</button>
+        </div>
+        <p class="hint" id="overlays-hint">Add text captions, titles, or lower-thirds.</p>
+        <div id="overlays-list" class="section" style="gap:0.35rem"></div>
+      </div>
+
+      <hr>
+
+      <div id="overlay-editor" class="overlay-editor hidden">
+        <h4>Edit Overlay</h4>
+        <label>Text
+          <input type="text" id="ov-text" placeholder="Type something..." oninput="previewOverlay()">
+        </label>
+        <div class="two-col">
+          <label>Start (s)
+            <input type="number" id="ov-start" step="0.1" min="0" value="0" oninput="previewOverlay()">
+          </label>
+          <label>Duration (s)
+            <input type="number" id="ov-dur" step="0.1" min="0.5" value="3" oninput="previewOverlay()">
+          </label>
+        </div>
+        <label>Style
+          <select id="ov-style" onchange="previewOverlay()">
+            <option value="subtitle">Subtitle (bottom bar)</option>
+            <option value="bold-pop">Bold Pop</option>
+            <option value="title">Full Title Card</option>
+            <option value="lower-third">Lower Third</option>
+            <option value="top-banner">Top Banner</option>
+          </select>
+        </label>
+        <label>Position
+          <select id="ov-pos" onchange="previewOverlay()">
+            <option value="bottom">Bottom</option>
+            <option value="center">Center</option>
+            <option value="top">Top</option>
+          </select>
+        </label>
+        <div class="two-col">
+          <label>Font size
+            <input type="number" id="ov-size" min="10" max="200" value="44" oninput="previewOverlay()">
+          </label>
+          <label>Color
+            <input type="color" id="ov-color" value="#ffffff" oninput="previewOverlay()">
+          </label>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="saveOverlay()">Save</button>
+          <button class="btn btn-danger" onclick="deleteCurrentOverlay()">Delete</button>
+          <button class="btn btn-ghost" onclick="closeOverlayEditor()">Cancel</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- EXPORT TAB -->
+    <div id="tab-export" class="tab-content">
+
+      <div class="section">
+        <h3>Output Format</h3>
+        <div class="format-grid">
+          <label class="format-card">
+            <input type="radio" name="fmt" value="reel" checked>
+            <div class="format-preview reel"><span>9:16</span></div>
+            <span>IG Reel<br>FB Short</span>
+          </label>
+          <label class="format-card">
+            <input type="radio" name="fmt" value="square">
+            <div class="format-preview square"><span>1:1</span></div>
+            <span>IG Square<br>FB Post</span>
+          </label>
+          <label class="format-card">
+            <input type="radio" name="fmt" value="landscape">
+            <div class="format-preview landscape"><span>16:9</span></div>
+            <span>Landscape<br>YouTube</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Quality</h3>
+        <select id="export-quality">
+          <option value="high">High — 1080p / ~20 Mbps</option>
+          <option value="med" selected>Medium — 720p / ~8 Mbps</option>
+          <option value="web">Web — 480p / ~4 Mbps</option>
+        </select>
+      </div>
+
+      <div class="section">
+        <h3>Summary</h3>
+        <div class="export-summary" id="export-summary">Load a video to see summary.</div>
+      </div>
+
+      <button id="btn-export" class="btn btn-primary btn-full" disabled onclick="runExport()">Export Video</button>
+
+      <div id="export-progress" class="export-progress hidden">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <p class="progress-text" id="progress-text">Loading FFmpeg…</p>
+      </div>
+
+      <div id="export-result" class="export-result hidden">
+        <p>Export complete!</p>
+        <a id="download-link" class="btn btn-primary" download="short.mp4">Download Video</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════ */
+const state = {
+  file: null,
+  videoUrl: null,
+  duration: 0,
+  audioBuffer: null,
+  cuts: [],       // {id, start, end, type, enabled, reason}
+  overlays: [],   // {id, text, start, dur, pos, style, size, color}
+  transcript: [], // {start, end, word, flagged, type}
+  editingOverlayId: null,
+  dragCutStart: null,
+  dragCutCurrent: null,
+  isDragging: false,
+  ffmpegLoaded: false,
+  nextId: 1,
+};
+
+/* ═══════════════════════════════════════════════════
+   VIDEO LOAD
+═══════════════════════════════════════════════════ */
+function loadVideo(file) {
+  if (!file) return;
+  state.file = file;
+  if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
+  state.videoUrl = URL.createObjectURL(file);
+
+  const video = document.getElementById('video');
+  video.src = state.videoUrl;
+  video.load();
+  video.addEventListener('loadedmetadata', onVideoLoaded, { once: true });
+
+  document.getElementById('upload-zone').classList.add('hidden');
+  document.getElementById('preview-panel').classList.remove('hidden');
+}
+
+function onVideoLoaded() {
+  const video = document.getElementById('video');
+  state.duration = video.duration;
+  updateTimeDisplay();
+  resizeCanvases();
+  decodeAudio();
+  enableButtons();
+  updateExportSummary();
+  toast('Video loaded — ' + formatTime(state.duration));
+  switchTab('analyze');
+}
+
+function enableButtons() {
+  document.getElementById('btn-detect').disabled = false;
+  document.getElementById('btn-transcribe').disabled = false;
+  document.getElementById('btn-export').disabled = false;
+}
+
+function replaceVideo() {
+  state.cuts = [];
+  state.overlays = [];
+  state.transcript = [];
+  document.getElementById('upload-zone').classList.remove('hidden');
+  document.getElementById('preview-panel').classList.add('hidden');
+  renderCutsList();
+  renderOverlaysList();
+}
+
+/* ═══════════════════════════════════════════════════
+   PLAYBACK CONTROLS
+═══════════════════════════════════════════════════ */
+function togglePlay() {
+  const v = document.getElementById('video');
+  if (v.paused) v.play(); else v.pause();
+}
+function toggleMute() {
+  const v = document.getElementById('video');
+  v.muted = !v.muted;
+  document.getElementById('btn-mute').textContent = v.muted ? '🔇' : '🔊';
+}
+function setVolume(val) { document.getElementById('video').volume = parseFloat(val); }
+function setSpeed(val) { document.getElementById('video').playbackRate = parseFloat(val); }
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowLeft') seekBy(-2);
+  if (e.code === 'ArrowRight') seekBy(2);
+});
+
+function seekBy(s) {
+  const v = document.getElementById('video');
+  v.currentTime = Math.max(0, Math.min(state.duration, v.currentTime + s));
+}
+
+document.getElementById('video').addEventListener('timeupdate', () => {
+  updateTimeDisplay();
+  updatePlayhead();
+  renderOverlayFrame();
+});
+document.getElementById('video').addEventListener('play', () => {
+  document.getElementById('btn-play').textContent = '⏸';
+});
+document.getElementById('video').addEventListener('pause', () => {
+  document.getElementById('btn-play').textContent = '▶';
+});
+
+function updateTimeDisplay() {
+  const v = document.getElementById('video');
+  document.getElementById('time-display').textContent =
+    formatTime(v.currentTime) + ' / ' + formatTime(state.duration);
+}
+
+function updatePlayhead() {
+  const ph = document.getElementById('playhead');
+  const body = document.getElementById('timeline-body');
+  if (!body || !state.duration) return;
+  const pct = document.getElementById('video').currentTime / state.duration;
+  ph.style.left = (pct * body.clientWidth) + 'px';
+}
+
+/* ═══════════════════════════════════════════════════
+   AUDIO DECODE + WAVEFORM
+═══════════════════════════════════════════════════ */
+async function decodeAudio() {
+  try {
+    const buf = await state.file.arrayBuffer();
+    const ac = new AudioContext();
+    state.audioBuffer = await ac.decodeAudioData(buf);
+    drawWaveform();
+    drawRuler();
+    toast('Audio decoded');
+  } catch (e) {
+    toast('Audio decode failed — silence detection unavailable', true);
+  }
+}
+
+function drawWaveform() {
+  const ab = state.audioBuffer;
+  if (!ab) return;
+  const canvas = document.getElementById('waveform-canvas');
+  resizeCanvases();
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const data = ab.getChannelData(0);
+  const step = Math.ceil(data.length / W);
+
+  ctx.fillStyle = 'rgba(192,98,42,0.12)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(192,98,42,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < W; i++) {
+    let mn = 1, mx = -1;
+    const base = i * step;
+    for (let j = 0; j < step; j++) {
+      const v = data[base + j] || 0;
+      if (v < mn) mn = v; if (v > mx) mx = v;
+    }
+    const y1 = ((1 + mn) / 2) * H;
+    const y2 = ((1 + mx) / 2) * H;
+    ctx.moveTo(i + 0.5, y1);
+    ctx.lineTo(i + 0.5, Math.max(y2, y1 + 1));
+  }
+  ctx.stroke();
+
+  drawCutLayer();
+}
+
+function drawRuler() {
+  const canvas = document.getElementById('ruler-canvas');
+  const W = canvas.offsetWidth; const H = canvas.offsetHeight;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#8c7560';
+  ctx.font = '9px Nunito, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+
+  const dur = state.duration;
+  if (!dur) return;
+  const interval = pickInterval(dur);
+  for (let t = 0; t <= dur; t += interval) {
+    const x = (t / dur) * W;
+    ctx.fillStyle = '#c4b09a';
+    ctx.fillRect(x, 0, 1, 5);
+    ctx.fillStyle = '#8c7560';
+    ctx.fillText(formatTime(t), x, 14);
+  }
+}
+
+function pickInterval(dur) {
+  if (dur < 15)  return 1;
+  if (dur < 60)  return 5;
+  if (dur < 300) return 15;
+  if (dur < 600) return 30;
+  return 60;
+}
+
+function resizeCanvases() {
+  const body = document.getElementById('timeline-body');
+  if (!body) return;
+  const W = body.clientWidth, H = body.clientHeight;
+  ['waveform-canvas', 'cut-layer'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c) { c.width = W; c.height = H; }
+  });
+  const ruler = document.getElementById('ruler-canvas');
+  if (ruler) { ruler.width = ruler.offsetWidth; ruler.height = ruler.offsetHeight; }
+
+  const vc = document.getElementById('overlay-canvas');
+  const vw = document.getElementById('video-wrapper');
+  if (vc && vw) { vc.width = vw.clientWidth; vc.height = vw.clientHeight; }
+}
+
+window.addEventListener('resize', () => {
+  resizeCanvases();
+  if (state.audioBuffer) drawWaveform();
+  drawRuler();
+  drawCutLayer();
+});
+
+/* ═══════════════════════════════════════════════════
+   SILENCE DETECTION
+═══════════════════════════════════════════════════ */
+async function runSilenceDetection() {
+  if (!state.audioBuffer) { toast('Audio not ready', true); return; }
+  const btn = document.getElementById('btn-detect');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Analyzing…';
+
+  await new Promise(r => setTimeout(r, 30));
+
+  const threshold = parseFloat(document.getElementById('silence-threshold').value);
+  const minDur = parseFloat(document.getElementById('min-pause').value);
+  const endGap = parseFloat(document.getElementById('end-gap').value) / 1000;
+
+  const ab = state.audioBuffer;
+  const data = ab.getChannelData(0);
+  const sr = ab.sampleRate;
+  const winMs = 40;
+  const winSamples = Math.floor(sr * winMs / 1000);
+
+  const silences = [];
+  let silStart = null;
+
+  for (let i = 0; i < data.length; i += winSamples) {
+    const end = Math.min(i + winSamples, data.length);
+    let rms = 0;
+    for (let j = i; j < end; j++) rms += data[j] * data[j];
+    rms = Math.sqrt(rms / (end - i));
+    const t = i / sr;
+    if (rms < threshold) {
+      if (silStart === null) silStart = t;
+    } else {
+      if (silStart !== null) {
+        const dur = t - silStart;
+        if (dur >= minDur) {
+          silences.push({
+            id: state.nextId++,
+            start: Math.max(0, silStart + endGap),
+            end: Math.max(0, t - endGap),
+            type: 'silence',
+            reason: `${dur.toFixed(2)}s silence`,
+            enabled: true
+          });
+        }
+        silStart = null;
+      }
+    }
+  }
+  if (silStart !== null) {
+    const dur = ab.duration - silStart;
+    if (dur >= minDur) {
+      silences.push({
+        id: state.nextId++,
+        start: Math.max(0, silStart + endGap),
+        end: ab.duration,
+        type: 'silence',
+        reason: `${dur.toFixed(2)}s silence`,
+        enabled: true
+      });
+    }
+  }
+
+  // Remove existing silence cuts, keep manual/AI
+  state.cuts = state.cuts.filter(c => c.type !== 'silence');
+  state.cuts.push(...silences);
+  state.cuts.sort((a, b) => a.start - b.start);
+
+  renderCutsList();
+  drawCutLayer();
+  updateExportSummary();
+  switchTab('cuts');
+  toast(`Found ${silences.length} silence${silences.length !== 1 ? 's' : ''}`);
+
+  btn.disabled = false;
+  btn.textContent = 'Detect Pauses';
+}
+
+/* ═══════════════════════════════════════════════════
+   AI TRANSCRIPT ANALYSIS
+═══════════════════════════════════════════════════ */
+async function runAIAnalysis() {
+  const openaiKey = document.getElementById('openai-key').value.trim();
+  const anthropicKey = document.getElementById('anthropic-key').value.trim();
+  if (!openaiKey) { toast('OpenAI API key required for transcription', true); return; }
+  if (!state.file) { toast('No video loaded', true); return; }
+
+  const btn = document.getElementById('btn-transcribe');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Transcribing…';
+
+  try {
+    // Extract audio blob (WebM/OGG format via AudioContext)
+    const audioBuf = state.audioBuffer;
+    const offCtx = new OfflineAudioContext(1, audioBuf.length, audioBuf.sampleRate);
+    const src = offCtx.createBufferSource();
+    src.buffer = audioBuf;
+    src.connect(offCtx.destination);
+    src.start();
+
+    // Send original file to Whisper (it handles video files directly)
+    const formData = new FormData();
+    formData.append('file', state.file, state.file.name);
+    formData.append('model', 'whisper-1');
+    formData.append('response_format', 'verbose_json');
+    formData.append('timestamp_granularities[]', 'word');
+
+    btn.innerHTML = '<span class="spinner"></span> Sending to Whisper…';
+
+    const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + openaiKey },
+      body: formData
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Whisper API error ${resp.status}`);
+    }
+
+    const whisperData = await resp.json();
+    const fullText = whisperData.text || '';
+    const words = whisperData.words || [];
+
+    // Build transcript state
+    state.transcript = words.map(w => ({
+      start: w.start, end: w.end, word: w.word, flagged: false, type: null
+    }));
+    renderTranscript();
+
+    // Claude analysis if key provided
+    if (anthropicKey) {
+      btn.innerHTML = '<span class="spinner"></span> Analyzing with Claude…';
+      await analyzeWithClaude(anthropicKey, fullText, words);
+    } else {
+      // Local heuristic: detect fillers and repeated words
+      detectStuttersLocally(words);
+    }
+
+    renderCutsList();
+    drawCutLayer();
+    updateExportSummary();
+    switchTab('cuts');
+    toast('Analysis complete');
+  } catch (e) {
+    toast('Error: ' + e.message, true);
+    console.error(e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Transcribe & Analyze';
+}
+
+async function analyzeWithClaude(apiKey, fullText, words) {
+  const wordList = words.map(w => `[${w.start.toFixed(2)}-${w.end.toFixed(2)}] ${w.word}`).join('\n');
+
+  const prompt = `You are analyzing a video transcript for a social media short. Find sections to cut.
+
+Transcript (word timestamps in seconds):
+${wordList}
+
+Full text:
+${fullText}
+
+Identify and return as JSON ONLY (no markdown):
+{
+  "cuts": [
+    {"start": 1.2, "end": 2.4, "reason": "brief description", "type": "stutter|filler|bad-take|repeat"}
+  ]
+}
+
+Find:
+1. Stutters: repeated syllables or words ("I I think", "um um")
+2. Filler words clusters: "um", "uh", "like", "you know", "I mean" (only when grouped, 2+ in 3 seconds)
+3. False starts: incomplete thought immediately restarted
+4. Messed-up lines: clearly wrong word followed by correction within 3 seconds
+5. Long awkward pauses within speech (but ONLY within speech, not natural pauses)
+
+Be conservative — only flag obvious problems. Prefer shorter cuts.`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Claude API error ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  const raw = data.content?.[0]?.text || '{}';
+
+  let parsed;
+  try {
+    // Strip potential markdown code fences
+    const json = raw.replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trim();
+    parsed = JSON.parse(json);
+  } catch {
+    toast('Could not parse Claude response — using local detection', true);
+    detectStuttersLocally(words);
+    return;
+  }
+
+  const endGap = parseFloat(document.getElementById('end-gap').value) / 1000;
+  const aiCuts = (parsed.cuts || []).map(c => ({
+    id: state.nextId++,
+    start: Math.max(0, c.start - endGap),
+    end: c.end + endGap,
+    type: c.type || 'stutter',
+    reason: c.reason || c.type,
+    enabled: true
+  }));
+
+  // Mark transcript words as flagged
+  aiCuts.forEach(cut => {
+    state.transcript.forEach(w => {
+      if (w.start >= cut.start && w.end <= cut.end) {
+        w.flagged = true; w.type = cut.type;
+      }
+    });
+  });
+
+  state.cuts = state.cuts.filter(c => !['stutter', 'filler', 'bad-take', 'repeat'].includes(c.type));
+  state.cuts.push(...aiCuts);
+  state.cuts.sort((a, b) => a.start - b.start);
+  renderTranscript();
+}
+
+function detectStuttersLocally(words) {
+  const fillers = new Set(['um', 'uh', 'erm', 'hmm', 'like', 'basically', 'literally', 'actually', 'so', 'right', 'okay', 'ok', 'yeah', 'yep', 'you know', 'i mean']);
+  const endGap = parseFloat(document.getElementById('end-gap').value) / 1000;
+  const cuts = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i].word.toLowerCase().replace(/[^a-z]/g, '');
+
+    // Repeated word
+    if (i > 0 && w === words[i - 1].word.toLowerCase().replace(/[^a-z]/g, '') && w.length > 1) {
+      cuts.push({
+        id: state.nextId++,
+        start: Math.max(0, words[i - 1].start - endGap),
+        end: words[i - 1].end + endGap,
+        type: 'stutter',
+        reason: `repeated "${words[i-1].word}"`,
+        enabled: true
+      });
+    }
+
+    // Filler cluster (2+ fillers within 3s)
+    if (fillers.has(w)) {
+      let j = i + 1;
+      let count = 1;
+      while (j < words.length && words[j].start - words[i].start < 3) {
+        if (fillers.has(words[j].word.toLowerCase().replace(/[^a-z]/g, ''))) count++;
+        j++;
+      }
+      if (count >= 2) {
+        cuts.push({
+          id: state.nextId++,
+          start: Math.max(0, words[i].start - endGap),
+          end: words[Math.min(j - 1, words.length - 1)].end + endGap,
+          type: 'filler',
+          reason: `filler words cluster`,
+          enabled: true
+        });
+        i = j - 1;
+      }
+    }
+  }
+
+  state.cuts = state.cuts.filter(c => !['stutter', 'filler'].includes(c.type));
+  state.cuts.push(...cuts);
+  state.cuts.sort((a, b) => a.start - b.start);
+
+  state.transcript.forEach(w => {
+    const wl = w.word.toLowerCase().replace(/[^a-z]/g, '');
+    if (fillers.has(wl)) { w.flagged = true; w.type = 'filler'; }
+  });
+  renderTranscript();
+}
+
+/* ═══════════════════════════════════════════════════
+   TRANSCRIPT RENDER
+═══════════════════════════════════════════════════ */
+function renderTranscript() {
+  const panel = document.getElementById('transcript-panel');
+  if (!state.transcript.length) return;
+  panel.innerHTML = '';
+  state.transcript.forEach(w => {
+    const span = document.createElement('span');
+    span.className = 'transcript-word' + (w.flagged ? ' flagged' : '') + (w.type === 'stutter' ? ' stutter' : '');
+    span.textContent = w.word + ' ';
+    span.title = `${w.start.toFixed(2)}s – ${w.end.toFixed(2)}s`;
+    span.onclick = () => { document.getElementById('video').currentTime = w.start; };
+    panel.appendChild(span);
+  });
+  document.getElementById('transcript-status').textContent =
+    state.transcript.filter(w => w.flagged).length + ' flagged';
+}
+
+/* ═══════════════════════════════════════════════════
+   CUT LAYER DRAWING
+═══════════════════════════════════════════════════ */
+function drawCutLayer() {
+  const canvas = document.getElementById('cut-layer');
+  if (!canvas || !state.duration) return;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const colors = {
+    silence:  'rgba(184,50,50,0.35)',
+    stutter:  'rgba(42,82,128,0.35)',
+    filler:   'rgba(42,82,128,0.28)',
+    'bad-take': 'rgba(184,124,0,0.35)',
+    repeat:   'rgba(42,82,128,0.35)',
+    manual:   'rgba(58,107,69,0.35)',
+  };
+  const borders = {
+    silence:  'rgba(184,50,50,0.7)',
+    stutter:  'rgba(42,82,128,0.7)',
+    filler:   'rgba(42,82,128,0.6)',
+    'bad-take': 'rgba(184,124,0,0.7)',
+    repeat:   'rgba(42,82,128,0.7)',
+    manual:   'rgba(58,107,69,0.7)',
+  };
+
+  state.cuts.forEach(cut => {
+    if (!cut.enabled) {
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    } else {
+      ctx.fillStyle = colors[cut.type] || 'rgba(100,100,100,0.3)';
+    }
+    const x1 = (cut.start / state.duration) * W;
+    const x2 = (cut.end / state.duration) * W;
+    ctx.fillRect(x1, 0, Math.max(x2 - x1, 2), H);
+    if (cut.enabled) {
+      ctx.strokeStyle = borders[cut.type] || 'rgba(100,100,100,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x1 + 0.75, 0.75, Math.max(x2 - x1 - 1.5, 1), H - 1.5);
+    }
+  });
+
+  // Overlay markers
+  state.overlays.forEach(ov => {
+    const x1 = (ov.start / state.duration) * W;
+    const x2 = ((ov.start + ov.dur) / state.duration) * W;
+    ctx.fillStyle = 'rgba(58,107,69,0.3)';
+    ctx.fillRect(x1, H - 10, Math.max(x2 - x1, 2), 10);
+    ctx.strokeStyle = 'rgba(58,107,69,0.7)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x1, H - 10, Math.max(x2 - x1, 1), 10);
+  });
+
+  // Drag region
+  if (state.isDragging && state.dragCutStart !== null && state.dragCutCurrent !== null) {
+    const a = Math.min(state.dragCutStart, state.dragCutCurrent);
+    const b = Math.max(state.dragCutStart, state.dragCutCurrent);
+    const x1 = (a / state.duration) * W;
+    const x2 = (b / state.duration) * W;
+    ctx.fillStyle = 'rgba(58,107,69,0.35)';
+    ctx.strokeStyle = 'rgba(58,107,69,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(x1, 0, x2 - x1, H);
+    ctx.strokeRect(x1 + 0.75, 0.75, Math.max(x2 - x1 - 1.5, 1), H - 1.5);
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   TIMELINE MOUSE EVENTS
+═══════════════════════════════════════════════════ */
+function timelineX(e) {
+  const body = document.getElementById('timeline-body');
+  const rect = body.getBoundingClientRect();
+  return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * state.duration;
+}
+
+function timelineClick(e) {
+  if (state.isDragging) return;
+  const t = timelineX(e);
+  document.getElementById('video').currentTime = t;
+}
+
+function timelineMouseDown(e) {
+  if (!state.duration) return;
+  state.isDragging = false;
+  state.dragCutStart = timelineX(e);
+  state.dragCutCurrent = state.dragCutStart;
+}
+
+function timelineMouseMove(e) {
+  if (state.dragCutStart === null) return;
+  const t = timelineX(e);
+  const diff = Math.abs(t - state.dragCutStart);
+  if (diff > 0.1) state.isDragging = true;
+  state.dragCutCurrent = t;
+  if (state.isDragging) drawCutLayer();
+}
+
+function timelineMouseUp(e) {
+  if (state.isDragging && state.dragCutStart !== null && state.dragCutCurrent !== null) {
+    const a = Math.min(state.dragCutStart, state.dragCutCurrent);
+    const b = Math.max(state.dragCutStart, state.dragCutCurrent);
+    if (b - a > 0.05) {
+      state.cuts.push({ id: state.nextId++, start: a, end: b, type: 'manual', reason: 'manual cut', enabled: true });
+      state.cuts.sort((a, b) => a.start - b.start);
+      renderCutsList();
+      drawCutLayer();
+      updateExportSummary();
+      switchTab('cuts');
+    }
+  }
+  state.isDragging = false;
+  state.dragCutStart = null;
+  state.dragCutCurrent = null;
+  drawCutLayer();
+}
+
+function timelineMouseLeave(e) {
+  if (state.isDragging) timelineMouseUp(e);
+}
+
+/* ═══════════════════════════════════════════════════
+   CUTS LIST
+═══════════════════════════════════════════════════ */
+function renderCutsList() {
+  const list = document.getElementById('cuts-list');
+  const hint = document.getElementById('cuts-hint');
+  list.innerHTML = '';
+  if (!state.cuts.length) { hint.style.display = ''; return; }
+  hint.style.display = 'none';
+
+  state.cuts.forEach(cut => {
+    const item = document.createElement('div');
+    item.className = 'cut-item' + (cut.enabled ? '' : ' disabled');
+    item.dataset.id = cut.id;
+
+    const typeLabels = { silence: 'Silence', stutter: 'Stutter', filler: 'Filler', 'bad-take': 'Bad Take', repeat: 'Repeat', manual: 'Manual' };
+    const badgeClass = { silence: 'badge-silence', stutter: 'badge-stutter', filler: 'badge-stutter', 'bad-take': 'badge-bad-take', repeat: 'badge-stutter', manual: 'badge-manual' };
+
+    item.innerHTML = `
+      <span class="cut-badge ${badgeClass[cut.type] || 'badge-manual'}">${typeLabels[cut.type] || cut.type}</span>
+      <span class="cut-time">${formatTime(cut.start)}–${formatTime(cut.end)}</span>
+      <span class="cut-reason">${cut.reason}</span>
+      <input type="checkbox" class="cut-toggle" ${cut.enabled ? 'checked' : ''} title="Enable/disable cut">
+      <button class="cut-del" title="Delete">✕</button>
+    `;
+    item.querySelector('.cut-toggle').onchange = ev => {
+      ev.stopPropagation();
+      cut.enabled = ev.target.checked;
+      item.classList.toggle('disabled', !cut.enabled);
+      drawCutLayer();
+      updateExportSummary();
+    };
+    item.querySelector('.cut-del').onclick = ev => {
+      ev.stopPropagation();
+      state.cuts = state.cuts.filter(c => c.id !== cut.id);
+      renderCutsList();
+      drawCutLayer();
+      updateExportSummary();
+    };
+    item.onclick = () => {
+      document.getElementById('video').currentTime = cut.start;
+    };
+    list.appendChild(item);
+  });
+  updateExportSummary();
+}
+
+function addManualCut() {
+  const v = document.getElementById('video');
+  const t = v.currentTime;
+  state.cuts.push({ id: state.nextId++, start: Math.max(0, t - 0.5), end: Math.min(state.duration, t + 0.5), type: 'manual', reason: 'manual', enabled: true });
+  state.cuts.sort((a, b) => a.start - b.start);
+  renderCutsList();
+  drawCutLayer();
+  updateExportSummary();
+}
+
+/* ═══════════════════════════════════════════════════
+   OVERLAYS
+═══════════════════════════════════════════════════ */
+function addOverlay() {
+  const v = document.getElementById('video');
+  const t = v.currentTime;
+  const ov = {
+    id: state.nextId++,
+    text: 'Your text here',
+    start: parseFloat(t.toFixed(2)),
+    dur: 3,
+    pos: 'bottom',
+    style: 'subtitle',
+    size: 44,
+    color: '#ffffff',
+  };
+  state.overlays.push(ov);
+  renderOverlaysList();
+  drawCutLayer();
+  openOverlayEditor(ov.id);
+}
+
+function renderOverlaysList() {
+  const list = document.getElementById('overlays-list');
+  const hint = document.getElementById('overlays-hint');
+  list.innerHTML = '';
+  if (!state.overlays.length) { hint.style.display = ''; return; }
+  hint.style.display = 'none';
+
+  state.overlays.forEach(ov => {
+    const item = document.createElement('div');
+    item.className = 'cut-item';
+    item.innerHTML = `
+      <span class="cut-badge badge-overlay">Text</span>
+      <span class="cut-time">${formatTime(ov.start)}</span>
+      <span class="cut-reason">${ov.text.substring(0, 25)}${ov.text.length > 25 ? '…' : ''}</span>
+      <button class="cut-del" title="Delete">✕</button>
+    `;
+    item.querySelector('.cut-del').onclick = ev => {
+      ev.stopPropagation();
+      state.overlays = state.overlays.filter(o => o.id !== ov.id);
+      renderOverlaysList();
+      drawCutLayer();
+      if (state.editingOverlayId === ov.id) closeOverlayEditor();
+    };
+    item.onclick = () => openOverlayEditor(ov.id);
+    list.appendChild(item);
+  });
+}
+
+function openOverlayEditor(id) {
+  const ov = state.overlays.find(o => o.id === id);
+  if (!ov) return;
+  state.editingOverlayId = id;
+  document.getElementById('ov-text').value = ov.text;
+  document.getElementById('ov-start').value = ov.start;
+  document.getElementById('ov-dur').value = ov.dur;
+  document.getElementById('ov-pos').value = ov.pos;
+  document.getElementById('ov-style').value = ov.style;
+  document.getElementById('ov-size').value = ov.size;
+  document.getElementById('ov-color').value = ov.color;
+  document.getElementById('overlay-editor').classList.remove('hidden');
+  switchTab('overlays');
+  previewOverlay();
+}
+
+function previewOverlay() {
+  const id = state.editingOverlayId;
+  const ov = state.overlays.find(o => o.id === id);
+  if (!ov) return;
+  ov.text  = document.getElementById('ov-text').value;
+  ov.start = parseFloat(document.getElementById('ov-start').value) || 0;
+  ov.dur   = parseFloat(document.getElementById('ov-dur').value) || 3;
+  ov.pos   = document.getElementById('ov-pos').value;
+  ov.style = document.getElementById('ov-style').value;
+  ov.size  = parseInt(document.getElementById('ov-size').value) || 44;
+  ov.color = document.getElementById('ov-color').value;
+  renderOverlayFrame();
+}
+
+function saveOverlay() {
+  previewOverlay();
+  renderOverlaysList();
+  drawCutLayer();
+  closeOverlayEditor();
+  toast('Overlay saved');
+}
+
+function deleteCurrentOverlay() {
+  const id = state.editingOverlayId;
+  state.overlays = state.overlays.filter(o => o.id !== id);
+  renderOverlaysList();
+  drawCutLayer();
+  closeOverlayEditor();
+}
+
+function closeOverlayEditor() {
+  document.getElementById('overlay-editor').classList.add('hidden');
+  state.editingOverlayId = null;
+  renderOverlayFrame();
+}
+
+/* ═══════════════════════════════════════════════════
+   OVERLAY CANVAS RENDER
+═══════════════════════════════════════════════════ */
+function renderOverlayFrame() {
+  const canvas = document.getElementById('overlay-canvas');
+  const video = document.getElementById('video');
+  if (!canvas || !video) return;
+  const W = canvas.width, H = canvas.height;
+  if (!W || !H) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const t = video.currentTime;
+  const active = state.overlays.filter(o => t >= o.start && t < o.start + o.dur);
+  active.forEach(ov => drawOverlay(ctx, ov, W, H));
+}
+
+function drawOverlay(ctx, ov, W, H) {
+  const text = ov.text;
+  const size = Math.round((ov.size / 100) * (H * 0.1)) * 10;
+  const fontSize = Math.max(12, Math.min(size, H * 0.15));
+  ctx.font = `bold ${fontSize}px Nunito, sans-serif`;
+  ctx.textAlign = 'center';
+
+  const lines = wrapText(ctx, text, W * 0.85);
+
+  const lineH = fontSize * 1.25;
+  const totalH = lines.length * lineH;
+  let baseY;
+  if (ov.pos === 'top')    baseY = fontSize + H * 0.05;
+  else if (ov.pos === 'center') baseY = (H - totalH) / 2 + fontSize;
+  else                     baseY = H - H * 0.06 - totalH + fontSize;
+
+  const padX = fontSize * 0.5, padY = fontSize * 0.3;
+
+  if (ov.style === 'subtitle') {
+    // Dark bar
+    const barH = totalH + padY * 2;
+    const barY = baseY - fontSize - padY;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(0, barY, W, barH);
+    ctx.fillStyle = ov.color;
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, baseY + i * lineH));
+  } else if (ov.style === 'bold-pop') {
+    // Stroke + fill
+    ctx.lineWidth = fontSize * 0.1;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    lines.forEach((line, i) => {
+      ctx.strokeText(line, W / 2, baseY + i * lineH);
+      ctx.fillStyle = ov.color;
+      ctx.fillText(line, W / 2, baseY + i * lineH);
+    });
+  } else if (ov.style === 'title') {
+    // Full card
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = ov.color;
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, H / 2 - (lines.length * lineH) / 2 + lineH * (i + 1)));
+  } else if (ov.style === 'lower-third') {
+    const barH = totalH + padY * 3;
+    ctx.fillStyle = 'rgba(192,98,42,0.9)';
+    ctx.fillRect(0, H - barH, W * 0.6, barH);
+    ctx.fillStyle = ov.color;
+    ctx.textAlign = 'left';
+    lines.forEach((line, i) => ctx.fillText(line, W * 0.03, H - barH + fontSize + padY + i * lineH));
+    ctx.textAlign = 'center';
+  } else if (ov.style === 'top-banner') {
+    const barH = totalH + padY * 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(0, 0, W, barH);
+    ctx.fillStyle = ov.color;
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, fontSize + padY + i * lineH));
+  }
+}
+
+function wrapText(ctx, text, maxWidth) {
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for (const word of words) {
+    const test = cur ? cur + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur); cur = word;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+/* ═══════════════════════════════════════════════════
+   EXPORT SUMMARY
+═══════════════════════════════════════════════════ */
+function updateExportSummary() {
+  const el = document.getElementById('export-summary');
+  if (!state.duration) { el.textContent = 'Load a video to see summary.'; return; }
+
+  const enabledCuts = state.cuts.filter(c => c.enabled);
+  let cutDuration = 0;
+  enabledCuts.forEach(c => cutDuration += (c.end - c.start));
+  const kept = state.duration - cutDuration;
+
+  el.innerHTML = `
+    <b>Original:</b> ${formatTime(state.duration)}<br>
+    <b>Cuts:</b> ${enabledCuts.length} (removing ${formatTime(cutDuration)})<br>
+    <b>Output:</b> ~${formatTime(Math.max(0, kept))}<br>
+    <b>Overlays:</b> ${state.overlays.length} text overlay${state.overlays.length !== 1 ? 's' : ''}
+  `;
+}
+
+/* ═══════════════════════════════════════════════════
+   FFMPEG EXPORT
+═══════════════════════════════════════════════════ */
+async function runExport() {
+  const btn = document.getElementById('btn-export');
+  const progressEl = document.getElementById('export-progress');
+  const resultEl = document.getElementById('export-result');
+  const fillEl = document.getElementById('progress-fill');
+  const textEl = document.getElementById('progress-text');
+
+  btn.disabled = true;
+  progressEl.classList.remove('hidden');
+  resultEl.classList.add('hidden');
+  setProgress(0, 'Loading FFmpeg…');
+
+  try {
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    const ffmpeg = createFFmpeg({
+      log: false,
+      corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+      progress: ({ ratio }) => setProgress(Math.round(ratio * 80) + 10, 'Encoding…')
+    });
+
+    setProgress(5, 'Loading FFmpeg…');
+    await ffmpeg.load();
+    setProgress(10, 'Reading video…');
+
+    ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(state.file));
+
+    const fmt = document.querySelector('input[name="fmt"]:checked').value;
+    const quality = document.getElementById('export-quality').value;
+
+    const qMap = { high: { crf: '18', scale: '1080' }, med: { crf: '23', scale: '720' }, web: { crf: '28', scale: '480' } };
+    const q = qMap[quality];
+
+    // Crop filter
+    const cropFilter = {
+      reel:      'crop=min(iw\\,ih*9/16):min(ih\\,iw*16/9),scale=-2:' + q.scale,
+      square:    'crop=min(iw\\,ih):min(ih\\,iw),scale=' + q.scale + ':' + q.scale,
+      landscape: 'scale=-2:' + q.scale,
+    }[fmt];
+
+    const enabledCuts = state.cuts.filter(c => c.enabled).sort((a, b) => a.start - b.start);
+
+    setProgress(15, 'Building segments…');
+
+    // Build keep segments
+    let keepSegs = buildKeepSegments(enabledCuts, state.duration);
+    if (!keepSegs.length) keepSegs = [{ start: 0, end: state.duration }];
+
+    // Build drawtext filters for overlays, adjusting timestamps after cuts
+    const drawtextFilters = buildDrawtextFilters(keepSegs);
+
+    setProgress(20, 'Building filter graph…');
+
+    // Build complex filtergraph
+    let filterParts = [];
+    let vLabels = [], aLabels = [];
+
+    keepSegs.forEach((seg, i) => {
+      filterParts.push(`[0:v]trim=start=${seg.start}:end=${seg.end},setpts=PTS-STARTPTS${i > 0 ? '' : ''},${cropFilter}[v${i}]`);
+      filterParts.push(`[0:a]atrim=start=${seg.start}:end=${seg.end},asetpts=PTS-STARTPTS[a${i}]`);
+      vLabels.push(`[v${i}]`);
+      aLabels.push(`[a${i}]`);
+    });
+
+    const n = keepSegs.length;
+    filterParts.push(`${vLabels.join('')}${aLabels.join('')}concat=n=${n}:v=1:a=1[vcat][acat]`);
+
+    let finalVLabel = '[vcat]';
+
+    if (drawtextFilters.length) {
+      let prev = 'vcat';
+      drawtextFilters.forEach((dt, i) => {
+        const cur = `vdt${i}`;
+        filterParts.push(`[${prev}]${dt}[${cur}]`);
+        prev = cur;
+      });
+      finalVLabel = `[${prev}]`;
+    }
+
+    const filterComplex = filterParts.join('; ');
+
+    setProgress(25, 'Encoding…');
+
+    await ffmpeg.run(
+      '-i', 'input.mp4',
+      '-filter_complex', filterComplex,
+      '-map', finalVLabel,
+      '-map', '[acat]',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', q.crf,
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      'output.mp4'
+    );
+
+    setProgress(90, 'Packaging…');
+    const data = ffmpeg.FS('readFile', 'output.mp4');
+    const blob = new Blob([data.buffer], { type: 'video/mp4' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.getElementById('download-link');
+    link.href = url;
+    const fmtNames = { reel: 'reel', square: 'square', landscape: 'landscape' };
+    link.download = `short_${fmtNames[fmt]}_${Date.now()}.mp4`;
+
+    setProgress(100, 'Done!');
+    progressEl.classList.add('hidden');
+    resultEl.classList.remove('hidden');
+    toast('Export complete — ready to download');
+
+    // Clean up
+    ['input.mp4', 'output.mp4'].forEach(f => { try { ffmpeg.FS('unlink', f); } catch {} });
+
+  } catch (e) {
+    console.error(e);
+    toast('Export failed: ' + e.message, true);
+    textEl.textContent = 'Export failed: ' + e.message;
+    setProgress(0, '');
+  }
+
+  btn.disabled = false;
+}
+
+function buildKeepSegments(enabledCuts, duration) {
+  let cursor = 0;
+  const segs = [];
+  for (const cut of enabledCuts) {
+    if (cut.start > cursor + 0.05) segs.push({ start: cursor, end: cut.start });
+    cursor = cut.end;
+  }
+  if (cursor < duration - 0.05) segs.push({ start: cursor, end: duration });
+  return segs;
+}
+
+function buildDrawtextFilters(keepSegs) {
+  if (!state.overlays.length) return [];
+  const filters = [];
+
+  state.overlays.forEach(ov => {
+    const adj = adjustOverlayTime(ov.start, ov.start + ov.dur, keepSegs);
+    if (!adj) return;
+
+    const text = ov.text.replace(/'/g, "\\'").replace(/:/g, '\\:').replace(/\n/g, ' ');
+    const positionY = { top: 'h*0.05', center: '(h-text_h)/2', bottom: 'h-text_h-h*0.05' }[ov.pos] || 'h-text_h-h*0.05';
+    const hexColor = ov.color.replace('#', '0x') + 'ff';
+    const fontSize = ov.size;
+
+    let filter;
+    if (ov.style === 'subtitle' || ov.style === 'top-banner') {
+      filter = `drawbox=x=0:y=${ov.pos === 'top' ? '0' : 'h-text_h-h*0.12'}:w=iw:h=ih*0.12:color=black@0.65:t=fill,drawtext=text='${text}':fontsize=${fontSize}:fontcolor=${hexColor}:x=(w-text_w)/2:y=${positionY}:enable='between(t,${adj.start.toFixed(3)},${adj.end.toFixed(3)})'`;
+    } else {
+      filter = `drawtext=text='${text}':fontsize=${fontSize}:fontcolor=${hexColor}:bordercolor=black:borderw=${Math.max(1, Math.round(fontSize * 0.06))}:x=(w-text_w)/2:y=${positionY}:enable='between(t,${adj.start.toFixed(3)},${adj.end.toFixed(3)})'`;
+    }
+    filters.push(filter);
+  });
+
+  return filters;
+}
+
+function adjustOverlayTime(ovStart, ovEnd, keepSegs) {
+  let cumulative = 0;
+  let adjStart = null, adjEnd = null;
+  for (const seg of keepSegs) {
+    if (adjStart === null && ovStart <= seg.end) {
+      adjStart = cumulative + Math.max(0, ovStart - seg.start);
+    }
+    if (adjEnd === null && ovEnd <= seg.end) {
+      adjEnd = cumulative + Math.max(0, ovEnd - seg.start);
+    }
+    cumulative += seg.end - seg.start;
+  }
+  if (adjStart === null) return null;
+  if (adjEnd === null) adjEnd = cumulative;
+  return { start: adjStart, end: adjEnd };
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  if (msg) document.getElementById('progress-text').textContent = msg;
+}
+
+/* ═══════════════════════════════════════════════════
+   UI HELPERS
+═══════════════════════════════════════════════════ */
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['analyze', 'cuts', 'overlays', 'export'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('tab-' + name);
+  if (el) el.classList.add('active');
+}
+
+let toastTimer;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+function formatTime(s) {
+  if (!isFinite(s) || s < 0) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60).toString().padStart(2, '0');
+  return `${m}:${sec}`;
+}
+
+/* ═══════════════════════════════════════════════════
+   DRAG AND DROP
+═══════════════════════════════════════════════════ */
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.add('dragover');
+}
+function onDragLeave(e) {
+  document.getElementById('upload-zone').classList.remove('dragover');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('video/')) loadVideo(file);
+}
+
+/* Also allow clicking anywhere on upload zone */
+document.getElementById('upload-zone').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+
+/* ═══════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════ */
+window.addEventListener('load', () => {
+  resizeCanvases();
+});
+</script>
+</body>
+</html>
